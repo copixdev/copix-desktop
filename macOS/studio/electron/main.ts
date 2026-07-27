@@ -11,6 +11,11 @@ import {
 	missingCopixModels,
 	modelIsAvailable,
 } from '../src/models/modelCatalog.js';
+import {
+	isSensitiveWorkspacePath,
+	shouldHideWorkspaceEntry,
+} from '../src/utils/workspaceIgnore.js';
+import { expandWorkspaceHome } from '../src/utils/workspaceHome.js';
 
 // Brand as Copix (not "Electron") in taskbar / Jump Lists / process UI.
 const APP_NAME = 'Copix';
@@ -159,15 +164,26 @@ function readWorkspaceHome(): string {
 	try {
 		const raw = fsSync.readFileSync(settingsPath(), 'utf8');
 		const settings = JSON.parse(raw) as { workspace?: { homeDirectory?: string } };
-		const home = settings.workspace?.homeDirectory?.trim();
-		if (home && !/copix-output/i.test(home.replace(/\\/g, '/'))) {
-			return path.normalize(home);
-		}
-	} catch { /* use default */ }
-	return path.normalize(defaultUserProjectsRoot());
+		return expandWorkspaceHome(settings.workspace?.homeDirectory, defaultUserProjectsRoot());
+	} catch {
+		return path.normalize(defaultUserProjectsRoot());
+	}
 }
 
 const projectsRoot = () => readWorkspaceHome();
+
+function legacySessionWorkspace(sessionId: string): string {
+	return path.join(agentsDir(), sessionId);
+}
+
+function sessionWorkspaceRoot(sessionId: string): string {
+	const preferred = path.join(projectsRoot(), '.copix', 'sessions', sessionId);
+	const legacy = legacySessionWorkspace(sessionId);
+	if (fsSync.existsSync(legacy) && !fsSync.existsSync(preferred)) {
+		return legacy;
+	}
+	return preferred;
+}
 
 function slugify(name: string): string {
 	return name
@@ -277,7 +293,7 @@ async function getGitRemote(workspaceRoot: string): Promise<string | undefined> 
 }
 
 async function ensureSessionWorkspace(sessionId: string): Promise<{ root: string; tree: string[] }> {
-	const root = path.join(agentsDir(), sessionId);
+	const root = sessionWorkspaceRoot(sessionId);
 	await fs.mkdir(root, { recursive: true });
 	await gitInit(root);
 	return { root, tree: await listTree(root) };
@@ -294,7 +310,7 @@ async function createNamedProject(
 	if (requestedBase) {
 		dest = path.isAbsolute(requestedBase)
 			? path.normalize(requestedBase)
-			: path.join(agentsDir(), sessionId, requestedBase);
+			: path.join(sessionWorkspaceRoot(sessionId), requestedBase);
 	} else {
 		const slug = slugify(name);
 		dest = path.join(projectsRoot(), slug);
@@ -495,7 +511,7 @@ app.whenReady().then(() => {
 	});
 
 	ipcMain.handle('copix:cloneRepo', async (_e, url: string, sessionId?: string) => {
-		const parent = sessionId ? path.join(agentsDir(), sessionId) : agentsDir();
+		const parent = sessionId ? sessionWorkspaceRoot(sessionId) : projectsRoot();
 		const name = url.split('/').pop()?.replace(/\.git$/, '') ?? 'repo';
 		const dest = path.join(parent, name);
 		await fs.mkdir(parent, { recursive: true });

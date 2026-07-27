@@ -40,10 +40,12 @@ export function shellPrompt(cwd: string): string {
 
 /** Example home path for settings placeholders / docs. */
 export function homePathExample(): string {
+	if (isWindows()) return 'C:\\Users\\{username}';
 	return '/Users/{username}';
 }
 
 /** Example project path used in agent prompts. */
 export function projectPathExample(name = 'my-app'): string {
+	if (isWindows()) return `C:\\Users\\{username}\\${name}`;
 	return `/Users/{username}/${name}`;
 }

@@ -7,7 +7,7 @@ echo "Copix macOS build"
 echo "Working directory: $(pwd)"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
-	echo "Error: Copix is a macOS-only app. Build on a Mac (e.g. /Users/baejuhan)."
+	echo "Error: Copix is a macOS-only app. Build on a Mac (e.g. /Users/{username})."
 	exit 1
 fi
 
@@ -35,4 +35,4 @@ find release release/staging -maxdepth 2 \( -name '*.dmg' -o -name '*.zip' -o -n
 	echo "  $f  ($size)"
 done
 echo "Done. Install from studio/release/Copix-*-mac-*.dmg (or open Copix.app)."
-echo "Recommended home directory: /Users/baejuhan"
+echo "Recommended home directory: /Users/{username}"

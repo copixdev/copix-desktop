@@ -255,7 +255,7 @@ export function SettingsPage({
 										...settings,
 										workspace: { homeDirectory: e.target.value },
 									})}
-									placeholder="/Users/baejuhan"
+									placeholder="/Users/{username}"
 								/>
 								<button
 									type="button"

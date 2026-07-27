@@ -73,7 +73,7 @@ Install [Ollama](https://ollama.com), and leave it running (`ollama serve` or a 
 
 ### 2. First session in Copix
 - Open **Settings** and set models, theme, and home directory (no login)
-- Preferences are written to `/Users/baejuhan/Copix/settings.json`
+- Preferences are written to `/Users/{username}/Copix/settings.json`
 - See **Settings file** and **Recommended settings** below
 - Test if Ollama sync works properly using one of the example prompts.
 
@@ -81,7 +81,7 @@ Install [Ollama](https://ollama.com), and leave it running (`ollama serve` or a 
 
 Copix stores all preferences locally (no accounts):
 
-**Path:** `/Users/baejuhan/Copix/settings.json` (same as `~/Copix/settings.json`)
+**Path:** `/Users/{username}/Copix/settings.json` (same as `~/Copix/settings.json`)
 
 The folder and file are created the first time you change Settings. Changing models, theme, workspace home, or agent mode updates this file; quitting and reopening Copix reloads it.
 
@@ -92,7 +92,7 @@ The folder and file are created the first time you change Settings. Changing mod
     "lowVram": false
   },
   "layout": { "sidebarWidth": 220, "editorWidth": 420 },
-  "workspace": { "homeDirectory": "/Users/baejuhan" },
+  "workspace": { "homeDirectory": "/Users/{username}" },
   "theme": "system",
   "agentMode": "code"
 }
@@ -113,7 +113,7 @@ Use the in-app Settings screen; hand-editing JSON is optional.
 
 **Requirements:** macOS + Node.js (`npm`)
 
-Copix macOS build (for `/Users/baejuhan`):
+Copix macOS build (for `/Users/{username}`):
 
 ```bash
 cd studio
@@ -129,7 +129,7 @@ cd studio && npm install && npm run dist
 Output: `studio/release/Copix-<version>-mac-arm64.dmg` (Apple Silicon) and/or `…-mac-x64.dmg` (Intel)  
 Running: open `Copix.app`, or drag it to Applications
 
-Recommended `workspace.homeDirectory`: `/Users/baejuhan`
+Recommended `workspace.homeDirectory`: `/Users/{username}`
 
 ## Download
 
@@ -155,7 +155,7 @@ Values below map to keys in `settings.json`.
 
 | Setting | `settings.json` | Recommended |
 | :-- | :-- | :-- |
-| Home Directory | `workspace.homeDirectory` | `/Users/baejuhan` |
+| Home Directory | `workspace.homeDirectory` | `/Users/{username}` |
 | Default Agent Mode | `agentMode` | `code` |
 
 

@@ -457,7 +457,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onOpenSetup, 
 								})}
 							/>
 							<label className="field-label">Home directory</label>
-							<p className="settings-hint">Where Copix creates new projects (default: /Users/baejuhan).</p>
+							<p className="settings-hint">Where Copix creates new projects (default: /Users/{username}).</p>
 							<div className="field-row">
 								<input
 									className="field-input"
@@ -466,7 +466,7 @@ export function SettingsModal({ open, settings, onClose, onChange, onOpenSetup, 
 										...settings,
 										workspace: { ...settings.workspace, homeDirectory: e.target.value },
 									})}
-									placeholder="/Users/baejuhan"
+									placeholder="/Users/{username}"
 								/>
 								<button
 									type="button"

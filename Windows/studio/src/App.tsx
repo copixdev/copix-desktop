@@ -6,6 +6,7 @@ import { CommandPalette, type PaletteCommand } from './components/CommandPalette
 import { EditorArea, type SidePanelMode } from './components/EditorArea';
 import { ResizableLayout } from './components/ResizableLayout';
 import { Sidebar } from './components/Sidebar';
+import { SubagentDock } from './components/SubagentDock';
 import { StatusBar } from './components/StatusBar';
 import { ToastProvider } from './components/Toast';
 import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData, ChatSession, titleFromMessage } from './hooks/chatSessions';
@@ -58,8 +59,14 @@ function AppInner() {
 	const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
 	const workspace = activeSession?.workspaceRoot;
 	const openAgentTabs = useMemo(
-		() => sessions.filter(s => !s.archived).slice(0, 8),
+		() => sessions.filter(s => !s.archived && !s.parentSessionId).slice(0, 8),
 		[sessions],
+	);
+	const subagentSessions = useMemo(
+		() => sessions.filter(s =>
+			s.parentSessionId && !s.archived && !s.subagentDismissed && s.id !== activeSessionId,
+		),
+		[sessions, activeSessionId],
 	);
 	const fileChanges = useMemo(
 		() => collectSessionChanges(activeSession?.messages ?? []),
@@ -281,11 +288,6 @@ function AppInner() {
 			tabs: [],
 		};
 		setSessions(prev => [session, ...prev]);
-		setActiveSessionId(session.id);
-		if (session.workspaceRoot) {
-			const ws = await copix.getWorkspace(session.workspaceRoot);
-			if (ws) setTree(ws.tree);
-		}
 		return { sessionId: session.id };
 	}, [sessions, activeSessionId]);
 
@@ -422,6 +424,7 @@ function AppInner() {
 					/>
 				}
 				chat={
+					<div className="chat-pane">
 					<ChatCenter
 						sessionId={activeSessionId}
 						workspace={workspace}
@@ -445,6 +448,19 @@ function AppInner() {
 						pendingPrompt={activeSession?.pendingPrompt}
 						onPendingPromptConsumed={() => patchSession(activeSessionId, { pendingPrompt: undefined })}
 					/>
+					<SubagentDock
+						sessions={subagentSessions}
+						settings={settings}
+						installedModels={installedModels}
+						serverOnline={serverOnline}
+						onMessagesChange={(id, msgs, title) =>
+							patchSession(id, { messages: msgs, ...(title ? { title } : {}) })}
+						onPendingPromptConsumed={id => patchSession(id, { pendingPrompt: undefined })}
+						onDismiss={id => patchSession(id, { subagentDismissed: true })}
+						onExpand={id => setActiveSessionId(id)}
+						onSpawnSubagent={handleSpawnSubagent}
+					/>
+					</div>
 				}
 				editor={
 					<EditorArea

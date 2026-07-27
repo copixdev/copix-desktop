@@ -279,13 +279,18 @@ Run a **local shell command** on the user's machine (${shellLabel()}). Output st
 		function: {
 			name: 'spawn_subagent',
 			description: `## spawn_subagent
-Delegate an isolated sub-task to a **child agent** with its own session.
+Delegate a focused sub-task to a **child agent** that runs in a **compact side panel** (parent chat stays open).
 
-**When to use:** Large refactors, multi-file features, deep investigation that benefits from a fresh context.
+**Use frequently:**
+- **Small jobs** — one file, one fix, one search, one test run (keeps parent context clean)
+- **Many jobs** — spawn **one subagent per independent task** and run several in parallel
+- **Large work** — refactors or multi-file features that deserve a fresh context
+
+**Do NOT do the work yourself when a subagent would be cleaner.** Prefer spawning over doing many sequential tool rounds in the parent.
 
 **Parameters:**
-- \`prompt\` (required) — detailed natural-language instructions
-- \`label\` — short title in the sidebar`,
+- \`prompt\` (required) — self-contained instructions (paths, goals, constraints)
+- \`label\` — short title shown in the compact panel (e.g. "Fix auth", "Add tests")`,
 			parameters: {
 				type: 'object',
 				properties: {
@@ -476,7 +481,7 @@ async function executeTool(
 				return { result: 'Subagent spawning is not available in this context' };
 			}
 			const { sessionId } = await ctx.onSpawnSubagent(prompt, label);
-			return { result: `Subagent started (${sessionId}). It will run the delegated task in a new agent session.` };
+			return { result: `Subagent "${label || sessionId}" started in compact panel (${sessionId}). It runs in parallel — continue coordinating from here or spawn more subagents.` };
 		}
 		default:
 			return { result: `Unknown tool: ${name}${name !== tool ? ` (normalized: ${tool})` : ''}` };

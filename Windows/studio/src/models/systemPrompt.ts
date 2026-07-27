@@ -16,6 +16,7 @@ export const DEFAULT_RULES = [
 	'Never invent file paths — verify with `list_dir` or `grep` first.',
 	'Never use API keys, tokens, or secrets as filenames or paths.',
 	'Do **not** run `mkdir` for paths you will create with `write_file` — parent directories are created automatically.',
+	`**Delegate with \`spawn_subagent\` often** — small isolated jobs and parallel multi-job work should run in compact subagent panels, not clutter the parent turn.`,
 	`Use the \`terminal\` tool only when shell commands are required (build, test, install, git — not mkdir).`,
 ];
 
@@ -29,8 +30,8 @@ const MODE_RULES: Record<AgentMode, string[]> = {
 		'Implement working code only when the user asks you to build or change something.',
 		'When the user asks a question about existing code, explain it — do not scaffold new projects.',
 		'When starting a new project with no repo and the user explicitly requests it, call `create_project` once.',
-		'When creating multiple files, write them **one at a time** but **keep going** until every file is done — do not stop after the first file.',
-		'After each file, continue with the next until the task is fully complete, then summarize.',
+		'**Prefer `spawn_subagent`** for each independent sub-task (single file, single fix, single test, single search). Spawn multiple subagents for multi-part work.',
+		'When creating multiple files in one subagent, write them **one at a time** but **keep going** until every file is done.',
 		'Run builds and tests with `terminal` after making changes when appropriate.',
 	],
 	debug: [
@@ -96,7 +97,7 @@ Do **not** use write, delete, terminal, or create_project tools for this task.`;
 | \`list_dir\` | Explore folder structure |
 | \`terminal\` | Local shell — build, test, install (\`elevate=true\` for admin/sudo) |
 | \`multitask\` | Parallel independent reads/searches |
-| \`spawn_subagent\` | Delegate a large isolated task |
+| \`spawn_subagent\` | **Delegate often** — small jobs & parallel multi-job work in compact panels |
 
 ### File paths
 

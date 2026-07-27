@@ -698,6 +698,110 @@ body.platform-darwin .titlebar {
 /* Chat */
 .chat-center { display: flex; flex-direction: column; height: 100%; background: var(--bg-0); position: relative; }
 
+.chat-pane {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+}
+
+.subagent-dock {
+	position: absolute;
+	right: 12px;
+	bottom: 88px;
+	z-index: 25;
+	display: flex;
+	flex-direction: column-reverse;
+	gap: 8px;
+	max-width: min(320px, calc(100% - 24px));
+	max-height: min(240px, 38vh);
+	overflow-y: auto;
+	pointer-events: none;
+	scrollbar-width: thin;
+}
+
+.subagent-window {
+	pointer-events: auto;
+	width: 300px;
+	max-width: 100%;
+	padding: 8px 10px;
+	border-radius: 10px;
+	border: 1px solid var(--border-strong);
+	background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+	backdrop-filter: blur(10px);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+	font-size: 11.5px;
+	line-height: 1.35;
+}
+.subagent-window.running { border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong)); }
+.subagent-window.done { border-color: color-mix(in srgb, #22c55e 40%, var(--border-strong)); }
+
+.subagent-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+.subagent-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--text-3);
+	flex-shrink: 0;
+}
+.subagent-dot.live {
+	background: var(--accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+	animation: subagent-pulse 1.2s ease-in-out infinite;
+}
+.subagent-dot.ok { background: #22c55e; }
+
+@keyframes subagent-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.55; }
+}
+
+.subagent-title {
+	flex: 1;
+	min-width: 0;
+	text-align: left;
+	border: none;
+	background: none;
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 600;
+	padding: 0;
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.subagent-title:hover { color: var(--accent-2); }
+
+.subagent-actions {
+	display: flex;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.subagent-status {
+	margin-top: 4px;
+	color: var(--text-2);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.subagent-steps {
+	margin: 6px 0 0;
+	padding: 0 0 0 14px;
+	color: var(--text-3);
+	font-size: 10.5px;
+}
+.subagent-steps li { margin: 2px 0; }
+.subagent-steps li.active { color: var(--accent-2); }
+
 .banner {
 	display: flex;
 	align-items: center;

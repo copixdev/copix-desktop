@@ -16,6 +16,8 @@ export interface ChatSession {
 	activePath?: string;
 	/** Parent agent session when spawned as a subagent. */
 	parentSessionId?: string;
+	/** User closed the compact subagent panel. */
+	subagentDismissed?: boolean;
 	/** Auto-run this prompt once when the session opens. */
 	pendingPrompt?: string;
 }

@@ -8,7 +8,7 @@ export {
 export type { ModelProvider } from '../types.js';
 
 import type { AgentMode } from './agentModes.js';
-import { FALLBACK_MODEL_ID, GROQ_BASE_URL, normalizeProvider } from './modelCatalog.js';
+import { FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, normalizeProvider } from './modelCatalog.js';
 import type { ModelProvider } from '../types.js';
 import { selectModelForTask } from './modelSelector.js';
 import type { ModelSettings } from '../types.js';
@@ -47,7 +47,7 @@ export function settingsToConfig(model: ModelSettings, modelId?: string): ModelC
 			baseUrl: GROQ_BASE_URL,
 			provider: 'groq',
 			apiKey: sanitizeApiKey(model.apiKey),
-			numPredict: 16384,
+			numPredict: GROQ_MAX_TOKENS,
 		};
 	}
 

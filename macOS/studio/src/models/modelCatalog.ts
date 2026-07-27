@@ -39,9 +39,9 @@ export const TASK_MODEL_PREFERENCE: Record<TaskKind, string> = {
 /** Groq free tier — no download, instant (https://console.groq.com). */
 export const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 
-/** Current Groq production / preview chat models (IDs change — keep in sync with console.groq.com/docs/models). */
+/** Free-tier friendly models (higher TPM / smaller requests). Avoid gpt-oss-120b on free — 8k TPM. */
 export const GROQ_MODE_MODEL_PREFERENCE: Record<AgentMode, string> = {
-	code: 'openai/gpt-oss-120b',
+	code: 'llama-3.3-70b-versatile',
 	debug: 'llama-3.3-70b-versatile',
 	terminal: 'llama-3.1-8b-instant',
 	plan: 'llama-3.3-70b-versatile',
@@ -51,21 +51,24 @@ export const GROQ_TASK_MODEL_PREFERENCE: Record<TaskKind, string> = {
 	inspect: 'llama-3.3-70b-versatile',
 	plan: 'llama-3.3-70b-versatile',
 	debug: 'llama-3.3-70b-versatile',
-	implement: 'openai/gpt-oss-120b',
+	implement: 'llama-3.3-70b-versatile',
 	terminal: 'llama-3.1-8b-instant',
 	general: 'llama-3.3-70b-versatile',
 };
 
 export const GROQ_FALLBACK_MODEL = 'llama-3.1-8b-instant';
 
-/** Ordered fallbacks when preferred Groq model returns 404 / no access. */
+/** Ordered fallbacks when preferred Groq model returns 404 / rate-limit / TPM errors. */
 export const GROQ_MODEL_FALLBACKS = [
-	'openai/gpt-oss-120b',
-	'openai/gpt-oss-20b',
-	'qwen/qwen3.6-27b',
 	'llama-3.3-70b-versatile',
 	'llama-3.1-8b-instant',
+	'openai/gpt-oss-20b',
+	'openai/gpt-oss-120b',
 ] as const;
+
+/** Free-tier TPM is tight — keep completion budget small so tools+prompt fit. */
+export const GROQ_MAX_TOKENS = 2048;
+export const GROQ_MAX_TOKENS_RETRY = 1024;
 
 export function normalizeProvider(provider?: string): ModelProvider {
 	return provider === 'groq' ? 'groq' : 'ollama';

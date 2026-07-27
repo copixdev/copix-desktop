@@ -4,7 +4,7 @@ import { copix } from '../api.js';
 import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import type { TaskKind } from './modelCatalog.js';
-import { GROQ_FALLBACK_MODEL, GROQ_MODEL_FALLBACKS } from './modelCatalog.js';
+import { GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS } from './modelCatalog.js';
 import { inferTaskKind, isContinuationMessage, isReadOnlyTask } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
@@ -304,9 +304,36 @@ Delegate a focused sub-task to a **child agent** that runs in a **compact side p
 	},
 ];
 
-function toolsForTask(taskKind: TaskKind): typeof TOOLS {
-	if (!isReadOnlyTask(taskKind)) return TOOLS;
-	return TOOLS.filter(t => READ_ONLY_TOOL_NAMES.has(t.function.name));
+const GROQ_TOOL_BLURBS: Record<string, string> = {
+	create_project: 'Scaffold a new empty project (only when user asks and workspace is empty).',
+	multitask: 'Run independent read/search/list/terminal tasks in parallel.',
+	read_file: 'Read a file from the workspace.',
+	edit_file: 'Search-and-replace in an existing file.',
+	write_file: 'Create or overwrite a file (parent dirs auto-created).',
+	append_file: 'Append text to a file.',
+	delete_file: 'Delete a file.',
+	grep: 'Search file contents with ripgrep.',
+	list_dir: 'List files in a directory.',
+	terminal: 'Run a local shell command in the workspace.',
+	spawn_subagent: 'Delegate a focused sub-task to a compact child agent panel.',
+};
+
+/** Shorter tool schemas for Groq free-tier TPM limits. */
+function compactTools(tools: typeof TOOLS): typeof TOOLS {
+	return tools.map(t => ({
+		...t,
+		function: {
+			...t.function,
+			description: GROQ_TOOL_BLURBS[t.function.name] ?? t.function.name,
+		},
+	}));
+}
+
+function toolsForTask(taskKind: TaskKind, provider?: string): typeof TOOLS {
+	const base = isReadOnlyTask(taskKind)
+		? TOOLS.filter(t => READ_ONLY_TOOL_NAMES.has(t.function.name))
+		: TOOLS;
+	return provider === 'groq' ? compactTools(base) : base;
 }
 
 type ChatMsg = {
@@ -575,8 +602,13 @@ async function streamCompletion(
 		? [...new Set([config.model, ...GROQ_MODEL_FALLBACKS, GROQ_FALLBACK_MODEL])]
 		: [config.model];
 
+	let maxTokens = config.provider === 'groq'
+		? Math.min(config.numPredict ?? GROQ_MAX_TOKENS, GROQ_MAX_TOKENS)
+		: (config.numPredict ?? 16384);
 	let lastError = '';
-	for (const modelId of modelCandidates) {
+
+	for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
+		const modelId = modelCandidates[attempt]!;
 		const requestBody = config.provider === 'groq'
 			? {
 				model: modelId,
@@ -584,7 +616,7 @@ async function streamCompletion(
 				...(opts.tools ? { tools: opts.tools } : {}),
 				stream: true,
 				temperature: 0.05,
-				max_tokens: config.numPredict ?? 16384,
+				max_tokens: maxTokens,
 			}
 			: {
 				model: modelId,
@@ -624,7 +656,10 @@ async function streamCompletion(
 			lastError = `${providerLabel} ${res.status}: ${message}`;
 			const modelMissing = res.status === 404
 				|| /does not exist|not found|do not have access|model_not_found/i.test(message);
-			if (config.provider === 'groq' && modelMissing && modelId !== modelCandidates[modelCandidates.length - 1]) {
+			const tooLarge = res.status === 413
+				|| /request too large|tokens per minute|tpm|rate_limit/i.test(message);
+			if (config.provider === 'groq' && (modelMissing || tooLarge) && attempt < modelCandidates.length - 1) {
+				if (tooLarge) maxTokens = GROQ_MAX_TOKENS_RETRY;
 				continue;
 			}
 			throw new Error(lastError);
@@ -633,6 +668,7 @@ async function streamCompletion(
 		if (modelId !== config.model) {
 			config.model = modelId;
 		}
+		config.numPredict = maxTokens;
 
 		const reader = res.body!.getReader();
 		const decoder = new TextDecoder();
@@ -681,13 +717,17 @@ async function streamCompletion(
 	throw new Error(lastError || `${providerLabel}: no available model`);
 }
 
-function historyToMessages(messages: Array<{ role: string; content: string }>, maxTurns = MAX_HISTORY_TURNS): ChatMsg[] {
+function historyToMessages(
+	messages: Array<{ role: string; content: string }>,
+	maxTurns = MAX_HISTORY_TURNS,
+	maxChars = MAX_MESSAGE_CHARS,
+): ChatMsg[] {
 	const filtered = messages
 		.filter(m => m.role === 'user' || m.role === 'assistant')
 		.map(m => ({
 			role: m.role as 'user' | 'assistant',
-			content: m.content.length > MAX_MESSAGE_CHARS
-				? `${m.content.slice(0, MAX_MESSAGE_CHARS)}\n…[truncated]`
+			content: m.content.length > maxChars
+				? `${m.content.slice(0, maxChars)}\n…[truncated]`
 				: m.content,
 		}));
 	return filtered.length > maxTurns ? filtered.slice(-maxTurns) : filtered;
@@ -709,8 +749,10 @@ export async function runAgent(
 ): Promise<void> {
 	const mode = options.mode ?? 'code';
 	const taskKind = options.taskKind ?? inferTaskKind(userMessage, mode);
-	const activeTools = toolsForTask(taskKind);
+	const activeTools = toolsForTask(taskKind, config.provider);
 	const effectiveUserMessage = augmentUserMessage(userMessage, priorMessages);
+	const historyTurns = config.provider === 'groq' ? 8 : MAX_HISTORY_TURNS;
+	const historyChars = config.provider === 'groq' ? 4000 : MAX_MESSAGE_CHARS;
 
 	const messages: ChatMsg[] = [
 		{
@@ -722,7 +764,7 @@ export async function runAgent(
 				userMessage: effectiveUserMessage,
 			}),
 		},
-		...historyToMessages(priorMessages, MAX_HISTORY_TURNS),
+		...historyToMessages(priorMessages, historyTurns, historyChars),
 		{ role: 'user', content: effectiveUserMessage },
 	];
 

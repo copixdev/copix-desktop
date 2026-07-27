@@ -23,7 +23,7 @@
 	--radius: 8px;
 	--radius-lg: 12px;
 	--radius-pill: 24px;
-	--font-copix: 'Inter', 'SF Pro Text', 'Segoe UI', 'Avenir Next', 'Nunito Variable', 'Nunito', system-ui, sans-serif;
+	--font-copix: 'Inter Variable', 'Inter', system-ui, sans-serif;
 	--font: var(--font-copix);
 	--mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
 	--shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
@@ -85,6 +85,20 @@ html, body, #root {
 	font-family: var(--font);
 	font-size: 13px;
 	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+/* macOS: native SF Pro stack — crisp, IDE-friendly typography */
+body.platform-darwin {
+	--font-copix: -apple-system, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', 'Inter Variable', 'Inter', system-ui, sans-serif;
+	font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+	letter-spacing: -0.011em;
+}
+
+/* Windows: Inter primary with Segoe UI fallback */
+body.platform-win32 {
+	--font-copix: 'Inter Variable', 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
 }
 
 body { transition: background-color 0.2s ease, color 0.2s ease; }

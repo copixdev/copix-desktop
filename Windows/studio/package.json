@@ -22,7 +22,7 @@
     "dist:dir": "node scripts/pre-dist.mjs && vite build && electron-builder --win dir && node scripts/post-dist.mjs"
   },
   "dependencies": {
-    "@fontsource-variable/nunito": "^5.2.7",
+    "@fontsource-variable/inter": "^5.2.8",
     "@monaco-editor/react": "^4.7.0",
     "monaco-editor": "^0.52.2",
     "react": "^19.0.0",

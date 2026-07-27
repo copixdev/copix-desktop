@@ -1,11 +1,21 @@
 export const OLLAMA_BASE_URL = 'http://127.0.0.1:11434/v1';
 export const DEFAULT_MODEL_ID = 'qwen2.5:3b';
 
+/** Context window passed to Ollama as options.num_ctx. */
+export const DEFAULT_NUM_CTX = 8192;
+export const LOW_VRAM_NUM_CTX = 4096;
+
+/** Max tokens per model response — large enough for multi-file writes. */
+export const DEFAULT_NUM_PREDICT = 8192;
+export const LOW_VRAM_NUM_PREDICT = 4096;
+
 export interface ModelConfig {
 	model: string;
 	baseUrl: string;
 	/** Passed to Ollama as options.num_ctx when set. */
 	numCtx?: number;
+	/** Passed to Ollama as options.num_predict when set. */
+	numPredict?: number;
 	/** Passed to Ollama as options.num_gpu (0 = CPU-only). */
 	numGpu?: number;
 }
@@ -15,7 +25,8 @@ export function settingsToConfig(model: { modelId: string; lowVram?: boolean }):
 	return {
 		model: model.modelId || DEFAULT_MODEL_ID,
 		baseUrl: OLLAMA_BASE_URL,
-		numCtx: lowVram ? 2048 : 4096,
+		numCtx: lowVram ? LOW_VRAM_NUM_CTX : DEFAULT_NUM_CTX,
+		numPredict: lowVram ? LOW_VRAM_NUM_PREDICT : DEFAULT_NUM_PREDICT,
 		numGpu: undefined,
 	};
 }

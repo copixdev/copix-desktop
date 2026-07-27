@@ -405,6 +405,15 @@ const SUMMARY_USER_PROMPT = `Provide a detailed markdown summary for the user:
 
 Do not call tools. Write clearly for the user.`;
 
+const CONTINUE_USER_PROMPT = `Continue the task from where you left off.
+- Create or edit any remaining files with tools.
+- Do not stop until the work is complete or you need user input.
+- When finished, reply with a clear markdown summary for the user.`;
+
+const MAX_AGENT_ROUNDS = 20;
+const MAX_HISTORY_TURNS = 12;
+const MAX_MESSAGE_CHARS = 8000;
+
 async function streamCompletion(
 	messages: ChatMsg[],
 	config: ModelConfig,
@@ -433,10 +442,10 @@ async function streamCompletion(
 			stream: true,
 			temperature: 0.1,
 			options: {
-				...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 4096 }),
-				num_predict: 2048,
+				...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 8192 }),
+				num_predict: config.numPredict ?? 8192,
 				num_batch: 512,
-				keep_alive: '10m',
+				keep_alive: '30m',
 			},
 		}),
 		signal,
@@ -507,14 +516,15 @@ function buildHeaders(): Record<string, string> {
 	return buildModelHeaders();
 }
 
-function historyToMessages(messages: Array<{ role: string; content: string }>, maxTurns = 12): ChatMsg[] {
+function historyToMessages(messages: Array<{ role: string; content: string }>, maxTurns = MAX_HISTORY_TURNS): ChatMsg[] {
 	const filtered = messages
 		.filter(m => m.role === 'user' || m.role === 'assistant')
 		.map(m => ({
 			role: m.role as 'user' | 'assistant',
-			content: m.content.length > 6000 ? `${m.content.slice(0, 6000)}\n…[truncated]` : m.content,
+			content: m.content.length > MAX_MESSAGE_CHARS
+				? `${m.content.slice(0, MAX_MESSAGE_CHARS)}\n…[truncated]`
+				: m.content,
 		}));
-	// Keep recent turns only — large histories crush local model speed/VRAM.
 	return filtered.length > maxTurns ? filtered.slice(-maxTurns) : filtered;
 }
 
@@ -539,12 +549,13 @@ export async function runAgent(
 				workspaceRoot: ctx.workspaceRoot,
 			}),
 		},
-		...historyToMessages(priorMessages, 8),
+		...historyToMessages(priorMessages, MAX_HISTORY_TURNS),
 		{ role: 'user', content: userMessage },
 	];
 
-	const maxRounds = 10;
+	const maxRounds = MAX_AGENT_ROUNDS;
 	let hadToolUse = false;
+	let emptyReplyRetries = 0;
 
 	for (let i = 0; i < maxRounds; i++) {
 		if (signal.aborted) return;
@@ -570,6 +581,11 @@ export async function runAgent(
 					return;
 				}
 				if (!assistantText.trim() && hadToolUse) {
+					if (emptyReplyRetries < 2) {
+						emptyReplyRetries++;
+						messages.push({ role: 'user', content: CONTINUE_USER_PROMPT });
+						continue;
+					}
 					break;
 				}
 				messages.push({ role: 'assistant', content: assistantText });
@@ -594,6 +610,15 @@ export async function runAgent(
 			for (const call of calls) {
 				let args: Record<string, unknown> = {};
 				try { args = JSON.parse(call.args || '{}'); } catch { /* empty */ }
+				if (!call.name) {
+					messages.push({
+						role: 'tool',
+						content: 'Tool call was incomplete — retry with valid tool arguments.',
+						tool_call_id: call.id,
+						name: call.name || 'unknown',
+					});
+					continue;
+				}
 				callbacks.onToolStart(call.id, call.name, args);
 				let meta: ToolResultMeta;
 				try {

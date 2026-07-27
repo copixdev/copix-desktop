@@ -21,6 +21,8 @@ const MODE_RULES: Record<AgentMode, string[]> = {
 	code: [
 		'Implement working code that matches existing project conventions.',
 		'When starting a new project with no repo, call `create_project` with a kebab-case name you generate.',
+		'When creating multiple files, write them one at a time — finish each `write_file` before starting the next.',
+		'Keep working with tools until the task is complete; do not stop after the first file.',
 	],
 	debug: [
 		'Reproduce the issue, form hypotheses, and validate with terminal or grep.',

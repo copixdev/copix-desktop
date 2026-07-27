@@ -80,7 +80,7 @@ Install [Ollama](https://ollama.com), and leave it running (`ollama serve` or a 
 
 **Requirements:** macOS + Node.js (`npm`)
 
-Copix is a **macOS-only** app (built for `/Users/baejuhan`).
+Copix is a **macOS-only** app.
 
 ```bash
 cd studio
@@ -96,7 +96,7 @@ cd studio && npm install && npm run dist
 Output: `studio/release/Copix-<version>-mac-arm64.dmg` (Apple Silicon) and/or `…-mac-x64.dmg` (Intel)  
 Running: open `Copix.app`, or drag it to Applications
 
-Recommended home directory in Settings: `/Users/baejuhan`
+Recommended home directory in Settings: `/Users/{username}/`
 
 ## Download
 

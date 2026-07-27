@@ -11,13 +11,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 	exit 1
 fi
 
-if [[ ! -d node_modules/electron-builder ]]; then
-	echo "[1/3] Installing dependencies (including electron-builder)..."
-	npm install
-else
-	echo "[1/3] Dependencies present — refreshing Electron binary for macOS…"
-	node scripts/install-electron.mjs
-fi
+echo "[1/3] Installing dependencies..."
+npm install
 
 # macOS Electron lives at dist/Electron.app/... — repair if a prior Windows/Linux extract left a bare "electron"
 if [[ ! -x node_modules/electron/dist/Electron.app/Contents/MacOS/Electron ]]; then

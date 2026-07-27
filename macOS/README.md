@@ -124,7 +124,7 @@ Open Copix from Applications (or the unpacked `.app`).
 
 | Preferences | Recommended | 
 | :--: | :-- |
-| Home Directory | `/Users/baejuhan` |
+| Home Directory | `/Users/{username}` |
 | Default Agent Mode | `Code` |
 
 

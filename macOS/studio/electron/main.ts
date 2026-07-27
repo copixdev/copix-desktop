@@ -19,6 +19,7 @@ import {
 	shouldHideWorkspaceEntry,
 } from '../src/utils/workspaceIgnore.js';
 import { expandWorkspaceHome } from '../src/utils/workspaceHome.js';
+import { DEFAULT_SETTINGS } from '../src/types.js';
 
 // Brand as Copix (not "Electron") in taskbar / Jump Lists / process UI.
 const APP_NAME = 'Copix';
@@ -535,9 +536,10 @@ app.whenReady().then(() => {
 				await fs.writeFile(primary, JSON.stringify(parsed, null, 2), 'utf8');
 				return parsed;
 			}
-			return null;
+			await fs.writeFile(primary, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf8');
+			return DEFAULT_SETTINGS;
 		} catch {
-			return null;
+			return DEFAULT_SETTINGS;
 		}
 	});
 

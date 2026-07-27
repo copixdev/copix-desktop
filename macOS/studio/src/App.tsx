@@ -108,8 +108,8 @@ function AppInner() {
 					...raw.model,
 					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
 					modelId: raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId,
-					provider: raw.model?.provider,
-					apiKey: raw.model?.apiKey,
+					provider: raw.model?.provider ?? DEFAULT_SETTINGS.model.provider,
+					apiKey: raw.model?.apiKey ?? DEFAULT_SETTINGS.model.apiKey,
 				},
 				layout: { ...DEFAULT_SETTINGS.layout, ...raw.layout },
 				workspace: {

@@ -75,6 +75,8 @@ export const DEFAULT_WORKSPACE: WorkspaceSettings = {
 };
 
 export const DEFAULT_MODEL: ModelSettings = {
+	provider: 'groq',
+	apiKey: 'gsk_YOUR_KEY_HERE',
 	selection: 'auto',
 	modelId: 'qwen2.5:3b',
 	lowVram: false,

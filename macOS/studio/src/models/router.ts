@@ -17,6 +17,11 @@ export interface AgentContext {
 	workspaceRoot: string;
 	onWorkspaceChange?: (root: string) => void;
 	onSpawnSubagent?: (prompt: string, label?: string) => Promise<{ sessionId: string }>;
+	/** Original user message for this agent turn (used to gate subagents). */
+	userMessage?: string;
+	taskKind?: TaskKind;
+	/** True when this run is already a child subagent — never nest further. */
+	isSubagent?: boolean;
 }
 
 interface MultitaskItem {
@@ -280,23 +285,29 @@ Run a **local shell command** on the user's machine (${shellLabel()}). Output st
 		function: {
 			name: 'spawn_subagent',
 			description: `## spawn_subagent
-Delegate a focused sub-task to a **child agent** that runs in a **compact side panel** (parent chat stays open).
+Spawn a child agent in a compact side panel. **Use rarely.**
 
-**Use frequently:**
-- **Small jobs** — one file, one fix, one search, one test run (keeps parent context clean)
-- **Many jobs** — spawn **one subagent per independent task** and run several in parallel
-- **Large work** — refactors or multi-file features that deserve a fresh context
+**ONLY when ALL of these are true:**
+- The user asked for a **large / difficult** multi-part coding task
+- Work splits into **2+ independent** heavy sub-tasks (e.g. parallel feature modules)
+- Doing it all in this chat would be clearly worse
 
-**Do NOT do the work yourself when a subagent would be cleaner.** Prefer spawning over doing many sequential tool rounds in the parent.
+**NEVER use for:**
+- Greetings, small talk, or clarifying questions
+- Inspect / explain / review / summarize
+- Single-file edits, one bugfix, one search, one test
+- Anything you can finish yourself in a few tool rounds
+
+Default: do the work yourself with normal tools.
 
 **Parameters:**
-- \`prompt\` (required) — self-contained instructions (paths, goals, constraints)
-- \`label\` — short title shown in the compact panel (e.g. "Fix auth", "Add tests")`,
+- \`prompt\` (required) — self-contained instructions for the hard sub-task
+- \`label\` — short panel title`,
 			parameters: {
 				type: 'object',
 				properties: {
 					prompt: { type: 'string', description: 'Detailed task prompt the subagent should follow' },
-					label: { type: 'string', description: 'Short title shown in the sidebar' },
+					label: { type: 'string', description: 'Short title shown in the panel' },
 				},
 				required: ['prompt'],
 			},
@@ -315,7 +326,7 @@ const GROQ_TOOL_BLURBS: Record<string, string> = {
 	grep: 'Search file contents with ripgrep.',
 	list_dir: 'List files in a directory.',
 	terminal: 'Run a local shell command in the workspace.',
-	spawn_subagent: 'Delegate a focused sub-task to a compact child agent panel.',
+	spawn_subagent: 'RARE: spawn child agent only for hard multi-part parallel work — never for greetings or simple tasks.',
 };
 
 /** Shorter tool schemas for Groq free-tier TPM limits. */
@@ -329,10 +340,27 @@ function compactTools(tools: typeof TOOLS): typeof TOOLS {
 	}));
 }
 
-function toolsForTask(taskKind: TaskKind, provider?: string): typeof TOOLS {
-	const base = isReadOnlyTask(taskKind)
+const SIMPLE_CHAT_RE = /^(hi|hello|hey|thanks|thank you|ok|okay|yo|sup|good morning|good evening|how are you|what can you do)\b[\s!.?]*$/i;
+const HARD_TASK_RE = /\b(refactor|migrate|multi[- ]?file|entire (app|project|codebase)|across (the )?(app|project|repo)|parallel|many files|full stack|end[- ]to[- ]end|large (feature|change)|architecture)\b/i;
+
+/** Subagents only for clearly hard multi-part implement work — not chat/inspect/simple edits. */
+export function shouldOfferSubagent(userMessage: string, taskKind: TaskKind): boolean {
+	const msg = userMessage.trim();
+	if (!msg || SIMPLE_CHAT_RE.test(msg) || msg.length < 24) return false;
+	if (isReadOnlyTask(taskKind) || taskKind === 'terminal' || taskKind === 'general') return false;
+	if (taskKind === 'implement' || taskKind === 'debug') {
+		return HARD_TASK_RE.test(msg) || msg.length >= 160;
+	}
+	return false;
+}
+
+function toolsForTask(taskKind: TaskKind, provider?: string, userMessage?: string): typeof TOOLS {
+	let base = isReadOnlyTask(taskKind)
 		? TOOLS.filter(t => READ_ONLY_TOOL_NAMES.has(t.function.name))
 		: TOOLS;
+	if (!userMessage || !shouldOfferSubagent(userMessage, taskKind)) {
+		base = base.filter(t => t.function.name !== 'spawn_subagent');
+	}
 	return provider === 'groq' ? compactTools(base) : base;
 }
 
@@ -504,12 +532,21 @@ async function executeTool(
 		case 'spawn_subagent': {
 			const prompt = String(args.prompt ?? '').trim();
 			if (!prompt) return { result: 'spawn_subagent requires a prompt' };
+			if (ctx.isSubagent) {
+				return { result: 'Refused: nested subagents are not allowed — finish this task yourself with tools.' };
+			}
+			const taskKind = ctx.taskKind ?? inferTaskKind(ctx.userMessage ?? prompt, 'code');
+			if (!shouldOfferSubagent(ctx.userMessage ?? '', taskKind)) {
+				return {
+					result: 'Refused: spawn_subagent is only for hard multi-part tasks. Do the work yourself with normal tools (read_file, write_file, edit_file, terminal, etc.).',
+				};
+			}
 			const label = args.label ? String(args.label) : undefined;
 			if (!ctx.onSpawnSubagent) {
 				return { result: 'Subagent spawning is not available in this context' };
 			}
 			const { sessionId } = await ctx.onSpawnSubagent(prompt, label);
-			return { result: `Subagent "${label || sessionId}" started in compact panel (${sessionId}). It runs in parallel — continue coordinating from here or spawn more subagents.` };
+			return { result: `Subagent "${label || sessionId}" started in compact panel (${sessionId}). Continue coordinating only if more hard parallel work remains; otherwise finish here.` };
 		}
 		default:
 			return { result: `Unknown tool: ${name}${name !== tool ? ` (normalized: ${tool})` : ''}` };
@@ -749,8 +786,13 @@ export async function runAgent(
 ): Promise<void> {
 	const mode = options.mode ?? 'code';
 	const taskKind = options.taskKind ?? inferTaskKind(userMessage, mode);
-	const activeTools = toolsForTask(taskKind, config.provider);
 	const effectiveUserMessage = augmentUserMessage(userMessage, priorMessages);
+	const activeTools = toolsForTask(taskKind, config.provider, effectiveUserMessage);
+	const runCtx: AgentContext = {
+		...ctx,
+		userMessage: effectiveUserMessage,
+		taskKind,
+	};
 	const historyTurns = config.provider === 'groq' ? 8 : MAX_HISTORY_TURNS;
 	const historyChars = config.provider === 'groq' ? 4000 : MAX_MESSAGE_CHARS;
 
@@ -793,7 +835,7 @@ export async function runAgent(
 						: parsed.actions;
 					if (actions.length) {
 						hadToolUse = true;
-						await executeStructuredActions({ ...parsed, actions }, ctx, callbacks);
+						await executeStructuredActions({ ...parsed, actions }, runCtx, callbacks);
 						callbacks.onClearText?.();
 						if (displayMessage) callbacks.onText(displayMessage);
 						messages.push({ role: 'assistant', content: displayMessage });
@@ -873,7 +915,7 @@ export async function runAgent(
 				callbacks.onToolStart(call.id, normalizeToolName(call.name), args);
 				let meta: ToolResultMeta;
 				try {
-					meta = await executeTool(call.name, args, ctx);
+					meta = await executeTool(call.name, args, runCtx);
 				} catch (err) {
 					meta = { result: err instanceof Error ? err.message : String(err) };
 				}

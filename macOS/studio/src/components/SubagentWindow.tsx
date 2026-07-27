@@ -91,7 +91,7 @@ export function SubagentWindow({
 				{
 					sessionId: session.id,
 					workspaceRoot: workspace,
-					onSpawnSubagent,
+					isSubagent: true,
 				},
 				chatMessagesToAgentHistory(session.messages),
 				abortRef.current.signal,

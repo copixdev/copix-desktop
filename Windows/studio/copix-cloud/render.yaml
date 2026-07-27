@@ -1,0 +1,18 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: copix-cloud
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: COPIX_API_KEY
+        generateValue: true
+      - key: BACKEND
+        value: ollama
+      - key: OLLAMA_URL
+        sync: false
+      - key: DEFAULT_MODEL
+        value: gpt-oss:20b
+      - key: RATE_LIMIT_PER_MIN
+        value: "30"

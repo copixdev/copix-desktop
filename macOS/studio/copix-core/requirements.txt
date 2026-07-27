@@ -1,0 +1,10 @@
+# Copix Core fine-tuning (GPU QLoRA on 8GB; gpt-oss needs ≥14GB)
+# torch installed separately via setup.ps1 (cu128 for RTX 50-series)
+transformers>=4.55.0
+peft>=0.17.0
+datasets>=2.18.0
+accelerate>=0.28.0
+bitsandbytes>=0.43.0
+safetensors>=0.4.0
+huggingface_hub>=0.24.0
+psutil>=5.9.0

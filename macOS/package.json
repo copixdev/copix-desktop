@@ -1,0 +1,17 @@
+{
+  "name": "copix",
+  "version": "4.1.0",
+  "private": true,
+  "description": "Copix — official AI IDE for macOS",
+  "author": "EJH-BAE",
+  "license": "MIT",
+  "scripts": {
+    "dist": "npm run dist --prefix studio",
+    "dist:dir": "npm run dist:dir --prefix studio",
+    "dist:mac": "npm run dist --prefix studio",
+    "studio": "npm run studio --prefix studio",
+    "studio:test": "npm run studio:test --prefix studio",
+    "start": "npm start --prefix studio",
+    "install:studio": "npm install --prefix studio"
+  }
+}

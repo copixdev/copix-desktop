@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Copix — Card payment</title>
+  <style>
+    :root {
+      --bg: #0b0b0d;
+      --card: #16161a;
+      --border: rgba(255,255,255,0.08);
+      --text: #f2f2f4;
+      --muted: #9a9aa3;
+      --accent: #1a5f7a;
+      --accent-2: #2a8fb0;
+      --ok: #4ade80;
+      --err: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: "Segoe UI", "Apple SD Gothic Neo", system-ui, sans-serif;
+      background: radial-gradient(ellipse at top, #122833 0%, var(--bg) 55%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(440px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+      animation: in 0.35s ease;
+    }
+    @keyframes in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: none; }
+    }
+    h1 { font-size: 22px; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+    .plan-pill {
+      display: inline-flex;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(26,95,122,0.25);
+      color: #9fd4e8;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+    .price { font-size: 32px; font-weight: 700; margin-bottom: 18px; }
+    .price span { font-size: 14px; color: var(--muted); font-weight: 500; }
+    label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin: 10px 0 5px;
+      font-weight: 500;
+    }
+    input, select {
+      width: 100%;
+      height: 40px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: #101014;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 12px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .receiver {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #101014;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .receiver strong { color: var(--text); }
+    button {
+      width: 100%;
+      height: 42px;
+      margin-top: 16px;
+      border: none;
+      border-radius: 10px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+    button:hover { background: var(--accent-2); }
+    button:disabled { opacity: 0.6; cursor: default; }
+    .err { color: var(--err); font-size: 12px; margin-top: 10px; display: none; }
+    .err.show { display: block; }
+    .ok { color: var(--ok); font-size: 13px; margin-top: 12px; display: none; }
+    .ok.show { display: block; }
+    .note { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="plan-pill" id="planPill">Pro Plan</div>
+    <h1>Card payment</h1>
+    <p class="sub">Pay with any card. Settlement receiver: Toss Bank.</p>
+    <div class="price" id="price">$20 <span>/ month</span></div>
+
+    <form id="payForm">
+      <label for="brand">Card brand</label>
+      <select id="brand">
+        <option>Visa</option>
+        <option>Mastercard</option>
+        <option>AMEX</option>
+        <option>JCB</option>
+        <option>UnionPay</option>
+        <option>Local card</option>
+      </select>
+
+      <label for="number">Card number</label>
+      <input id="number" inputmode="numeric" placeholder="ACCT-000015" autocomplete="cc-number" required />
+
+      <div class="grid2">
+        <div>
+          <label for="expiry">Expiry</label>
+          <input id="expiry" placeholder="MM/YY" autocomplete="cc-exp" required />
+        </div>
+        <div>
+          <label for="cvc">CVC</label>
+          <input id="cvc" inputmode="numeric" placeholder="123" autocomplete="cc-csc" required />
+        </div>
+      </div>
+
+      <label for="name">Name on card</label>
+      <input id="name" placeholder="Full name" autocomplete="cc-name" required />
+
+      <div class="receiver">
+        Receiver: <strong id="holder">Copix</strong> · <span id="bank">토스뱅크 (Toss Bank)</span><br />
+        Account: <strong id="account">1000-0000-0000</strong>
+      </div>
+
+      <p class="err" id="err">Enter a valid card number, expiry, CVC, and name.</p>
+      <button type="submit" id="payBtn">Pay now</button>
+      <p class="ok" id="ok">Payment submitted. We’ll confirm and activate your plan.</p>
+    </form>
+    <p class="note">Replace Toss account details in this file (or Copix <code>paymentConfig.ts</code>) before deploying to Netlify.</p>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const plan = (params.get('plan') || 'pro').toLowerCase();
+    const isMax = plan === 'max';
+    document.getElementById('planPill').textContent = isMax ? 'Max Plan' : 'Pro Plan';
+    document.getElementById('price').innerHTML = isMax
+      ? '$60 <span>/ month</span>'
+      : '$20 <span>/ month</span>';
+    document.getElementById('payBtn').textContent = isMax ? 'Pay $60' : 'Pay $20';
+
+    // Edit before Netlify deploy:
+    const TOSS = {
+      bank: '토스뱅크 (Toss Bank)',
+      account: '1000-0000-0000',
+      holder: 'Copix',
+    };
+    document.getElementById('bank').textContent = TOSS.bank;
+    document.getElementById('account').textContent = TOSS.account;
+    document.getElementById('holder').textContent = TOSS.holder;
+
+    document.getElementById('payForm').onsubmit = (e) => {
+      e.preventDefault();
+      const number = document.getElementById('number').value.replace(/\s/g, '');
+      const expiry = document.getElementById('expiry').value;
+      const cvc = document.getElementById('cvc').value;
+      const name = document.getElementById('name').value.trim();
+      const err = document.getElementById('err');
+      const ok = document.getElementById('ok');
+      err.classList.remove('show');
+      ok.classList.remove('show');
+      if (number.length < 12 || !expiry.includes('/') || cvc.length < 3 || !name) {
+        err.classList.add('show');
+        return;
+      }
+      const btn = document.getElementById('payBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing…';
+      setTimeout(() => {
+        ok.classList.add('show');
+        btn.textContent = 'Submitted';
+      }, 900);
+    };
+  </script>
+</body>
+</html>

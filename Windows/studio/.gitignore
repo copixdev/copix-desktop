@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-electron
+release/*
+!release/*.exe
+!release/*.exe.blockmap
+*.log
+.env
+.venv/
+output/
+tools/llama.cpp/
+__pycache__/
+*.pyc

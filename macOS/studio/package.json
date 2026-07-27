@@ -1,0 +1,114 @@
+{
+  "name": "copix",
+  "version": "4.1.0",
+  "private": true,
+  "description": "Copix — official AI IDE for macOS",
+  "author": "EJH-BAE",
+  "license": "MIT",
+  "homepage": "https://github.com/EJH-BAE/Copix",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/install-electron.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "prestart": "npm run build",
+    "start": "node scripts/check-build.mjs && electron .",
+    "core:dev": "node copix-core/dev-server.mjs",
+    "studio": "vite",
+    "studio:test": "npm run build && node scripts/check-build.mjs && electron .",
+    "studio:app": "npm run dist:dir && open release/staging/mac*/Copix.app",
+    "icons": "node scripts/generate-icons.mjs",
+    "dist": "node scripts/pre-dist.mjs && vite build && electron-builder --mac dmg zip && node scripts/post-dist.mjs",
+    "dist:dir": "node scripts/pre-dist.mjs && vite build && electron-builder --mac dir && node scripts/post-dist.mjs",
+    "dist:mac": "npm run dist",
+    "dist:mac:dir": "npm run dist:dir"
+  },
+  "dependencies": {
+    "@fontsource-variable/nunito": "^5.2.7",
+    "@monaco-editor/react": "^4.7.0",
+    "@supabase/supabase-js": "^2.110.2",
+    "monaco-editor": "^0.52.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^9.0.3",
+    "react-syntax-highlighter": "^15.6.1",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.1",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "build": {
+    "appId": "com.copix.app",
+    "productName": "Copix",
+    "copyright": "Copyright © EJH-BAE",
+    "executableName": "Copix",
+    "directories": {
+      "output": "release/staging",
+      "buildResources": "build"
+    },
+    "afterPack": "./scripts/afterPack.cjs",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "copix-core",
+        "to": "copix-core",
+        "filter": [
+          "**/*",
+          "!.venv/**",
+          "!output/**",
+          "!tools/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "artifactName": "Copix-${version}-mac-${arch}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "Copix ${version}",
+      "artifactName": "Copix-${version}-mac-${arch}.${ext}"
+    },
+    "asar": true
+  }
+}

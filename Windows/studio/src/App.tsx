@@ -12,7 +12,7 @@ import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData
 import { DEFAULT_SETTINGS, AppSettings, ThemePreference } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
-import { formatModelChipLabel } from './models/modelSelector';
+import { formatModelChipLabel, preferredModelForTask } from './models/modelSelector';
 import { IconPlus, IconBranch } from './components/Icons';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
@@ -68,6 +68,10 @@ function AppInner() {
 	const statusBarModel = formatModelChipLabel(
 		settings.model,
 		resolveModelConfig(settings.model, settings.agentMode, installedModels).model,
+		{
+			preferred: preferredModelForTask(settings.agentMode),
+			installed: installedModels,
+		},
 	);
 
 	useEffect(() => { setReviewFiles(null); }, [activeSessionId]);

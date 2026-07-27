@@ -41,8 +41,9 @@ export function resolveModelConfig(
 	model: ModelSettings,
 	agentMode: AgentMode,
 	installed: string[] = [],
+	userMessage?: string,
 ): ModelConfig {
-	const modelId = selectModelForTask(agentMode, model, installed);
+	const modelId = selectModelForTask(agentMode, model, installed, userMessage);
 	return settingsToConfig(model, modelId);
 }
 

@@ -3,6 +3,8 @@ import { buildModelHeaders, resolveChatUrl } from './config.js';
 import { copix } from '../api.js';
 import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
+import type { TaskKind } from './modelCatalog.js';
+import { inferTaskKind, isReadOnlyTask } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
 import { assertSafeFilePath } from '../utils/secrets.js';
@@ -33,6 +35,11 @@ function fileStats(content: string): string {
 	return `${lines} lines, ${bytes} bytes`;
 }
 
+const READ_ONLY_TOOL_NAMES = new Set(['read_file', 'list_dir', 'grep', 'multitask']);
+const WRITE_TOOL_NAMES = new Set([
+	'create_project', 'write_file', 'append_file', 'edit_file', 'delete_file', 'terminal', 'run_terminal',
+]);
+
 const TOOLS = [
 	{
 		type: 'function' as const,
@@ -41,7 +48,12 @@ const TOOLS = [
 			description: `## create_project
 Scaffold a new git-initialized project folder.
 
-**When to use:** User asks for a new app, site, or repo from scratch.
+**When to use:** ONLY when the user explicitly asks for a brand-new app/site/repo AND the workspace is empty.
+
+**Do NOT use when:**
+- The user asks to inspect, explain, or review existing code
+- The workspace already has files
+- The user referenced an existing folder or project
 
 **Output location:** \`${projectPathExample('<kebab-name>')}\` unless \`outputPath\` is set.
 
@@ -286,6 +298,11 @@ Delegate an isolated sub-task to a **child agent** with its own session.
 	},
 ];
 
+function toolsForTask(taskKind: TaskKind): typeof TOOLS {
+	if (!isReadOnlyTask(taskKind)) return TOOLS;
+	return TOOLS.filter(t => READ_ONLY_TOOL_NAMES.has(t.function.name));
+}
+
 type ChatMsg = {
 	role: 'system' | 'user' | 'assistant' | 'tool';
 	content: string;
@@ -344,6 +361,17 @@ async function executeTool(
 	const tool = normalizeToolName(name);
 	switch (tool) {
 		case 'create_project': {
+			const entries = await copix.listDir(undefined, ws);
+			const existing = entries.filter(e => {
+				const name = e.replace(/\/$/, '');
+				return name && name !== 'README.md';
+			});
+			if (existing.length > 0) {
+				return {
+					result: `Refused create_project: workspace already has files (${existing.slice(0, 10).join(', ')}). `
+						+ 'Use list_dir and read_file to inspect, or edit_file/write_file to modify.',
+				};
+			}
 			const projectName = String(args.name ?? 'project');
 			assertSafeFilePath(projectName);
 			const desc = args.description ? String(args.description) : undefined;
@@ -615,6 +643,7 @@ function historyToMessages(messages: Array<{ role: string; content: string }>, m
 
 export interface AgentRunOptions {
 	mode?: AgentMode;
+	taskKind?: TaskKind;
 }
 
 export async function runAgent(
@@ -626,12 +655,18 @@ export async function runAgent(
 	callbacks: AgentCallbacks,
 	options: AgentRunOptions = {},
 ): Promise<void> {
+	const mode = options.mode ?? 'code';
+	const taskKind = options.taskKind ?? inferTaskKind(userMessage, mode);
+	const activeTools = toolsForTask(taskKind);
+
 	const messages: ChatMsg[] = [
 		{
 			role: 'system',
 			content: buildSystemPrompt({
-				mode: options.mode ?? 'code',
+				mode,
 				workspaceRoot: ctx.workspaceRoot,
+				taskKind,
+				userMessage,
 			}),
 		},
 		...historyToMessages(priorMessages, MAX_HISTORY_TURNS),
@@ -647,19 +682,26 @@ export async function runAgent(
 		callbacks.onStatus(`${config.model}…`);
 
 		try {
-			const round = await streamCompletion(messages, config, signal, callbacks, { tools: TOOLS });
+			const round = await streamCompletion(messages, config, signal, callbacks, { tools: activeTools });
 			const { assistantText, toolCalls } = round;
 
 			if (!toolCalls.size) {
 				const parsed = parseStructuredResponse(assistantText);
 				if (parsed) {
 					const displayMessage = parsed.message || '(done)';
-					if (parsed.actions.length) {
-						await executeStructuredActions(parsed, ctx, callbacks);
+					const actions = isReadOnlyTask(taskKind)
+						? parsed.actions.filter(a => {
+							const mapped = actionToTool(a);
+							return mapped && !WRITE_TOOL_NAMES.has(normalizeToolName(mapped.tool));
+						})
+						: parsed.actions;
+					if (actions.length) {
+						await executeStructuredActions({ ...parsed, actions }, ctx, callbacks);
 						callbacks.onClearText?.();
 						callbacks.onText(displayMessage);
 					} else {
 						callbacks.onStructuredResponse?.(parsed);
+						if (displayMessage) callbacks.onText(displayMessage);
 					}
 					messages.push({ role: 'assistant', content: displayMessage });
 					callbacks.onStatus('');
@@ -701,6 +743,16 @@ export async function runAgent(
 						content: 'Tool call was incomplete — retry with valid tool arguments.',
 						tool_call_id: call.id,
 						name: call.name || 'unknown',
+					});
+					continue;
+				}
+				const toolName = normalizeToolName(call.name);
+				if (isReadOnlyTask(taskKind) && WRITE_TOOL_NAMES.has(toolName)) {
+					messages.push({
+						role: 'tool',
+						content: `Refused ${toolName}: read-only task — use list_dir/read_file/grep and explain in chat.`,
+						tool_call_id: call.id,
+						name: call.name,
 					});
 					continue;
 				}

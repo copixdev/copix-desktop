@@ -10,7 +10,10 @@ import {
 	FALLBACK_MODEL_ID,
 	missingCopixModels,
 	modelIsAvailable,
+	normalizeProvider,
+	startupPullModels,
 } from '../src/models/modelCatalog.js';
+import { GROQ_BASE_URL } from '../src/models/modelCatalog.js';
 import {
 	isSensitiveWorkspacePath,
 	shouldHideWorkspaceEntry,
@@ -57,6 +60,33 @@ let mainWindow: BrowserWindow | undefined;
 
 const OLLAMA_HOST = 'http://127.0.0.1:11434';
 
+function readModelSettingsFromDisk(): { provider?: string; apiKey?: string } {
+	try {
+		const raw = fsSync.readFileSync(settingsPath(), 'utf8');
+		const parsed = JSON.parse(raw) as { model?: { provider?: string; apiKey?: string } };
+		return parsed.model ?? {};
+	} catch {
+		return {};
+	}
+}
+
+async function fetchGroqStatus(): Promise<{ online: boolean; hasModel: boolean }> {
+	const { apiKey } = readModelSettingsFromDisk();
+	if (!apiKey?.trim()) return { online: false, hasModel: false };
+	try {
+		const res = await fetch(`${GROQ_BASE_URL}/models`, {
+			headers: {
+				Authorization: `Bearer ${apiKey.trim()}`,
+				'Content-Type': 'application/json',
+			},
+			signal: AbortSignal.timeout(5000),
+		});
+		return { online: res.ok, hasModel: res.ok };
+	} catch {
+		return { online: false, hasModel: false };
+	}
+}
+
 async function fetchOllamaStatus(): Promise<{
 	online: boolean;
 	hasModel: boolean;
@@ -81,23 +111,53 @@ async function fetchServerHealth(): Promise<{
 	hasModel?: boolean;
 	models?: string[];
 	missing?: string[];
+	provider?: string;
 }> {
+	const modelSettings = readModelSettingsFromDisk();
+	const provider = normalizeProvider(modelSettings.provider);
+
+	if (provider === 'groq') {
+		const g = await fetchGroqStatus();
+		return {
+			online: g.online,
+			hasModel: g.hasModel,
+			models: g.online ? ['groq-cloud'] : [],
+			missing: [],
+			provider: 'groq',
+		};
+	}
+
 	const s = await fetchOllamaStatus();
 	return {
 		online: s.online && s.hasModel,
 		hasModel: s.hasModel,
 		models: s.models,
 		missing: s.missing,
+		provider: 'ollama',
 	};
 }
 
-async function ensureCopixModelsInternal(): Promise<{ ok: boolean; message: string; pulled: string[] }> {
+async function ensureCopixModelsInternal(full = false): Promise<{ ok: boolean; message: string; pulled: string[] }> {
+	const modelSettings = readModelSettingsFromDisk();
+	if (normalizeProvider(modelSettings.provider) === 'groq') {
+		const g = await fetchGroqStatus();
+		if (!g.online) {
+			return {
+				ok: false,
+				message: 'Add model.apiKey in ~/Copix/settings.json — free key at console.groq.com',
+				pulled: [],
+			};
+		}
+		return { ok: true, message: 'Groq cloud ready — no local download needed', pulled: [] };
+	}
+
 	const s = await fetchOllamaStatus();
 	if (!s.online) {
-		return { ok: false, message: 'Ollama offline — install from ollama.com and open the Ollama app', pulled: [] };
+		return { ok: false, message: 'Ollama offline — install from ollama.com or set model.provider to groq', pulled: [] };
 	}
+	const toPull = full ? s.missing : startupPullModels(s.models);
 	const pulled: string[] = [];
-	for (const model of s.missing) {
+	for (const model of toPull) {
 		const result = await pullModelInternal(model);
 		if (result.ok) pulled.push(model);
 		else {
@@ -111,11 +171,15 @@ async function ensureCopixModelsInternal(): Promise<{ ok: boolean; message: stri
 		}
 	}
 	if (!pulled.length && s.hasModel) {
-		return { ok: true, message: 'All Copix models ready', pulled: [] };
+		return {
+			ok: true,
+			message: full ? 'All Copix models ready' : 'Ollama ready (large models download on Check Ollama)',
+			pulled: [],
+		};
 	}
 	return {
 		ok: true,
-		message: pulled.length ? `Downloaded ${pulled.join(', ')}` : 'All Copix models ready',
+		message: pulled.length ? `Downloaded ${pulled.join(', ')}` : 'Ollama ready',
 		pulled,
 	};
 }
@@ -672,21 +736,15 @@ function looksLikeSecretPath(filePath: string): boolean {
 
 	ipcMain.handle('copix:getServerStatus', () => fetchServerHealth());
 
-	ipcMain.handle('copix:startServer', async () => {
-		const s = await fetchOllamaStatus();
-		if (!s.online) {
-			return { ok: false, message: 'Ollama not running — install from ollama.com and open the Ollama app' };
-		}
-		return ensureCopixModelsInternal();
-	});
+	ipcMain.handle('copix:startServer', async () => ensureCopixModelsInternal(true));
 
 	ipcMain.handle('copix:pullOllamaModel', async (_e, model = FALLBACK_MODEL_ID) => pullModelInternal(model));
 
-	ipcMain.handle('copix:ensureCopixModels', () => ensureCopixModelsInternal());
+	ipcMain.handle('copix:ensureCopixModels', () => ensureCopixModelsInternal(false));
 
 	createWindow();
 
-	void ensureCopixModelsInternal().then(result => {
+	void ensureCopixModelsInternal(false).then(result => {
 		if (result.pulled.length) {
 			mainWindow?.webContents.send('copix:modelsReady', result.message);
 		}

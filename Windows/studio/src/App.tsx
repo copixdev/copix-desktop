@@ -12,6 +12,7 @@ import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData
 import { DEFAULT_SETTINGS, AppSettings, ThemePreference } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
+import { normalizeProvider } from './models/modelCatalog';
 import { formatModelChipLabel, preferredModelForTask } from './models/modelSelector';
 import { IconPlus, IconBranch } from './components/Icons';
 import { TitleBarMenu } from './components/TitleBarMenu';
@@ -69,10 +70,11 @@ function AppInner() {
 		settings.model,
 		resolveModelConfig(settings.model, settings.agentMode, installedModels).model,
 		{
-			preferred: preferredModelForTask(settings.agentMode),
+			preferred: preferredModelForTask(settings.agentMode, settings.model),
 			installed: installedModels,
 		},
 	);
+	const modelProvider = normalizeProvider(settings.model.provider);
 
 	useEffect(() => { setReviewFiles(null); }, [activeSessionId]);
 
@@ -99,6 +101,8 @@ function AppInner() {
 					...raw.model,
 					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
 					modelId: raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId,
+					provider: raw.model?.provider,
+					apiKey: raw.model?.apiKey,
 				},
 				layout: { ...DEFAULT_SETTINGS.layout, ...raw.layout },
 				workspace: {
@@ -484,6 +488,7 @@ function AppInner() {
 			<StatusBar
 				workspace={workspace}
 				model={statusBarModel}
+				provider={modelProvider}
 				online={serverOnline}
 			/>
 

@@ -42,7 +42,13 @@ export type ThemePreference = 'system' | 'dark' | 'light';
 
 export type ModelSelectionMode = 'auto' | 'manual';
 
+export type ModelProvider = 'ollama' | 'groq';
+
 export interface ModelSettings {
+	/** ollama = local (default). groq = free cloud, no model download. */
+	provider?: ModelProvider;
+	/** Required when provider is groq — free at console.groq.com */
+	apiKey?: string;
 	/** Auto picks a model by agent mode; manual uses modelId. */
 	selection?: ModelSelectionMode;
 	modelId: string;

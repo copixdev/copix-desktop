@@ -3,10 +3,11 @@ import { IconFolder } from './Icons';
 interface Props {
 	workspace?: string;
 	model: string;
+	provider?: 'ollama' | 'groq';
 	online: boolean;
 }
 
-export function StatusBar({ workspace, model, online }: Props) {
+export function StatusBar({ workspace, model, provider = 'ollama', online }: Props) {
 	return (
 		<footer className="statusbar">
 			<div className="statusbar-left">
@@ -21,7 +22,7 @@ export function StatusBar({ workspace, model, online }: Props) {
 				<span className="status-item" title="Model from ~/Copix/settings.json">
 					<span className={`status-dot ${online ? 'on' : 'off'}`} />
 					{model}
-					<span className="status-sub">ollama</span>
+					<span className="status-sub">{provider}</span>
 				</span>
 			</div>
 		</footer>

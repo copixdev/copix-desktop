@@ -543,12 +543,17 @@ async function streamCompletion(
 		callbacks.onThinkingEnd();
 	};
 
-	let res: Response;
-	try {
-		res = await fetch(url, {
-		method: 'POST',
-		headers: buildHeaders(),
-		body: JSON.stringify({
+	const providerLabel = config.provider === 'groq' ? 'Groq' : 'Ollama';
+	const requestBody = config.provider === 'groq'
+		? {
+			model: config.model,
+			messages,
+			...(opts.tools ? { tools: opts.tools } : {}),
+			stream: true,
+			temperature: 0.1,
+			max_tokens: config.numPredict ?? 8192,
+		}
+		: {
 			model: config.model,
 			messages,
 			...(opts.tools ? { tools: opts.tools } : {}),
@@ -560,25 +565,30 @@ async function streamCompletion(
 				num_batch: 512,
 				keep_alive: '30m',
 			},
-		}),
+		};
+
+	let res: Response;
+	try {
+		res = await fetch(url, {
+		method: 'POST',
+		headers: buildModelHeaders(config),
+		body: JSON.stringify(requestBody),
 		signal,
 	});
 	} catch (err) {
 		if (signal.aborted) return { assistantText: '', toolCalls: new Map() };
 		const msg = err instanceof Error ? err.message : String(err);
-		const label = 'Ollama';
-		throw new Error(`Cannot reach ${label} at ${config.baseUrl} — ${msg}`);
+		throw new Error(`Cannot reach ${providerLabel} at ${config.baseUrl} — ${msg}`);
 	}
 
 	if (!res.ok) {
 		const errText = await res.text().catch(() => '');
-		const label = 'Ollama';
 		let message = errText.slice(0, 800) || res.statusText;
 		try {
 			const parsed = JSON.parse(errText) as { error?: { message?: string } };
 			if (parsed.error?.message) message = parsed.error.message;
 		} catch { /* raw text */ }
-		throw new Error(`${label} ${res.status}: ${message}`);
+		throw new Error(`${providerLabel} ${res.status}: ${message}`);
 	}
 
 	const reader = res.body!.getReader();
@@ -623,10 +633,6 @@ async function streamCompletion(
 
 	endThinking();
 	return { assistantText, toolCalls };
-}
-
-function buildHeaders(): Record<string, string> {
-	return buildModelHeaders();
 }
 
 function historyToMessages(messages: Array<{ role: string; content: string }>, maxTurns = MAX_HISTORY_TURNS): ChatMsg[] {

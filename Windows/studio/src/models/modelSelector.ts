@@ -2,7 +2,11 @@ import type { AgentMode } from './agentModes.js';
 import type { ModelSettings } from '../types.js';
 import {
 	FALLBACK_MODEL_ID,
+	GROQ_FALLBACK_MODEL,
+	GROQ_MODE_MODEL_PREFERENCE,
+	GROQ_TASK_MODEL_PREFERENCE,
 	MODE_MODEL_PREFERENCE,
+	normalizeProvider,
 	TASK_MODEL_PREFERENCE,
 	modelIsAvailable,
 	type TaskKind,
@@ -41,7 +45,17 @@ export function normalizeModelSettings(model: ModelSettings): ModelSettings & { 
 	return { ...model, selection };
 }
 
-function pickFromCandidates(candidates: string[], installed: string[], lowVram: boolean): string {
+function pickGroqModel(candidates: string[]): string {
+	const seen = new Set<string>();
+	for (const id of candidates) {
+		if (seen.has(id)) continue;
+		seen.add(id);
+		return id;
+	}
+	return GROQ_FALLBACK_MODEL;
+}
+
+function pickOllamaModel(candidates: string[], installed: string[], lowVram: boolean): string {
 	const seen = new Set<string>();
 	const ordered = lowVram
 		? [...candidates, 'qwen3.5:4b', FALLBACK_MODEL_ID]
@@ -56,7 +70,7 @@ function pickFromCandidates(candidates: string[], installed: string[], lowVram: 
 	return modelIsAvailable(FALLBACK_MODEL_ID, installed) ? FALLBACK_MODEL_ID : candidates[0] ?? FALLBACK_MODEL_ID;
 }
 
-/** Pick the Ollama model tag for this agent turn. */
+/** Pick the model tag for this agent turn. */
 export function selectModelForTask(
 	agentMode: AgentMode,
 	settings: ModelSettings,
@@ -64,25 +78,43 @@ export function selectModelForTask(
 	userMessage?: string,
 ): string {
 	const normalized = normalizeModelSettings(settings);
+	const provider = normalizeProvider(settings.provider);
+
 	if (normalized.selection === 'manual') {
-		const manual = normalized.modelId || FALLBACK_MODEL_ID;
+		const manual = normalized.modelId || (provider === 'groq' ? GROQ_FALLBACK_MODEL : FALLBACK_MODEL_ID);
+		if (provider === 'groq') return manual;
 		if (modelIsAvailable(manual, installed)) return manual;
 		return modelIsAvailable(FALLBACK_MODEL_ID, installed) ? FALLBACK_MODEL_ID : manual;
 	}
 
 	const taskKind = userMessage ? inferTaskKind(userMessage, agentMode) : null;
+
+	if (provider === 'groq') {
+		const preferred = taskKind
+			? GROQ_TASK_MODEL_PREFERENCE[taskKind]
+			: GROQ_MODE_MODEL_PREFERENCE[agentMode] ?? GROQ_FALLBACK_MODEL;
+		return pickGroqModel([preferred, GROQ_FALLBACK_MODEL]);
+	}
+
 	const preferred = taskKind
 		? TASK_MODEL_PREFERENCE[taskKind]
 		: MODE_MODEL_PREFERENCE[agentMode] ?? FALLBACK_MODEL_ID;
 
-	return pickFromCandidates([preferred], installed, Boolean(normalized.lowVram));
+	return pickOllamaModel([preferred], installed, Boolean(normalized.lowVram));
 }
 
 export function preferredModelForTask(
 	agentMode: AgentMode,
+	settings: ModelSettings,
 	userMessage?: string,
 ): string {
+	const provider = normalizeProvider(settings.provider);
 	const taskKind = userMessage ? inferTaskKind(userMessage, agentMode) : null;
+	if (provider === 'groq') {
+		return taskKind
+			? GROQ_TASK_MODEL_PREFERENCE[taskKind]
+			: GROQ_MODE_MODEL_PREFERENCE[agentMode] ?? GROQ_FALLBACK_MODEL;
+	}
 	return taskKind
 		? TASK_MODEL_PREFERENCE[taskKind]
 		: MODE_MODEL_PREFERENCE[agentMode] ?? FALLBACK_MODEL_ID;
@@ -94,12 +126,17 @@ export function formatModelChipLabel(
 	opts?: { preferred?: string; installed?: string[] },
 ): string {
 	const normalized = normalizeModelSettings(settings);
-	if (normalized.selection === 'manual') return activeModel;
+	const provider = normalizeProvider(settings.provider);
+	const prefix = normalized.selection === 'manual' ? '' : 'auto · ';
+
+	if (provider === 'groq') {
+		return `${prefix}${activeModel}`;
+	}
 
 	const preferred = opts?.preferred;
 	const installed = opts?.installed ?? [];
-	if (preferred && preferred !== activeModel && !modelIsAvailable(preferred, installed)) {
-		return `auto · ${activeModel} · pull ${preferred.split(':')[0]}`;
+	if (normalized.selection !== 'manual' && preferred && preferred !== activeModel && !modelIsAvailable(preferred, installed)) {
+		return `${prefix}${activeModel} · pull ${preferred.split(':')[0]}`;
 	}
-	return `auto · ${activeModel}`;
+	return `${prefix}${activeModel}`;
 }

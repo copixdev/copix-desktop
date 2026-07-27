@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent 
 import { runAgent } from '../models/router';
 
 import { resolveModelConfig } from '../models/config';
+import { normalizeProvider } from '../models/modelCatalog';
 import { formatModelChipLabel, inferTaskKind, preferredModelForTask } from '../models/modelSelector';
 
 import { copix } from '../api';
@@ -205,7 +206,7 @@ export function ChatCenter({
 
 	const [showScroll, setShowScroll] = useState(false);
 
-	const [server, setServer] = useState<{ online: boolean; models?: string[] }>({ online: false });
+	const [server, setServer] = useState<{ online: boolean; models?: string[]; provider?: 'ollama' | 'groq' }>({ online: false });
 
 	const [starting, setStarting] = useState(false);
 
@@ -231,9 +232,10 @@ export function ChatCenter({
 		[settings.model, agentMode, server.models, input],
 	);
 	const preferredModel = useMemo(
-		() => preferredModelForTask(agentMode, input.trim() || undefined),
-		[agentMode, input],
+		() => preferredModelForTask(agentMode, settings.model, input.trim() || undefined),
+		[agentMode, settings.model, input],
 	);
+	const modelProvider = normalizeProvider(settings.model.provider);
 	const modelChipLabel = formatModelChipLabel(settings.model, config.model, {
 		preferred: preferredModel,
 		installed: server.models,
@@ -607,9 +609,13 @@ export function ChatCenter({
 
 			{!modelReady && (
 				<div className="banner banner-warn">
-					<span>Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models (qwen2.5-coder, mistral, qwen3.5)</span>
+					<span>
+						{modelProvider === 'groq'
+							? 'Groq not ready — add model.apiKey in ~/Copix/settings.json (free key at console.groq.com, no download needed)'
+							: 'Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models (qwen2.5-coder, mistral, qwen3.5)'}
+					</span>
 					<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
-						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : 'Check Ollama'}
+						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : modelProvider === 'groq' ? 'Check Groq' : 'Check Ollama'}
 					</button>
 				</div>
 			)}

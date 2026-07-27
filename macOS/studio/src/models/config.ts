@@ -18,6 +18,15 @@ export const LOW_VRAM_NUM_CTX = 8192;
 export const DEFAULT_NUM_PREDICT = 16384;
 export const LOW_VRAM_NUM_PREDICT = 8192;
 
+/** Strip whitespace and reject placeholder keys from defaults / docs. */
+export function sanitizeApiKey(apiKey?: string): string | undefined {
+	const key = apiKey?.trim();
+	if (!key) return undefined;
+	if (/gsk_YOUR_KEY_HERE/i.test(key)) return undefined;
+	if (/^gsk_x+$/i.test(key)) return undefined;
+	return key;
+}
+
 export interface ModelConfig {
 	model: string;
 	baseUrl: string;
@@ -37,7 +46,7 @@ export function settingsToConfig(model: ModelSettings, modelId?: string): ModelC
 			model: resolved,
 			baseUrl: GROQ_BASE_URL,
 			provider: 'groq',
-			apiKey: model.apiKey?.trim(),
+			apiKey: sanitizeApiKey(model.apiKey),
 			numPredict: 16384,
 		};
 	}

@@ -73,11 +73,12 @@ function readModelSettingsFromDisk(): { provider?: string; apiKey?: string } {
 
 async function fetchGroqStatus(): Promise<{ online: boolean; hasModel: boolean }> {
 	const { apiKey } = readModelSettingsFromDisk();
-	if (!apiKey?.trim()) return { online: false, hasModel: false };
+	const key = apiKey?.trim();
+	if (!key || /gsk_YOUR_KEY_HERE/i.test(key)) return { online: false, hasModel: false };
 	try {
 		const res = await fetch(`${GROQ_BASE_URL}/models`, {
 			headers: {
-				Authorization: `Bearer ${apiKey.trim()}`,
+				Authorization: `Bearer ${key}`,
 				'Content-Type': 'application/json',
 			},
 			signal: AbortSignal.timeout(5000),

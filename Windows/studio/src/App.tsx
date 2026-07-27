@@ -46,6 +46,7 @@ function AppInner() {
 	});
 	const [activeSessionId, setActiveSessionId] = useState(() => sessions[0]?.id ?? '');
 	const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+	const [settingsReady, setSettingsReady] = useState(false);
 	const [tree, setTree] = useState<string[]>([]);
 	const [serverOnline, setServerOnline] = useState(false);
 	const [installedModels, setInstalledModels] = useState<string[]>([]);
@@ -98,8 +99,15 @@ function AppInner() {
 
 	useEffect(() => {
 		copix.getSettings().then(s => {
-			if (!s) return;
-			if ('presetId' in s) { setSettings(DEFAULT_SETTINGS); return; }
+			if (!s) {
+				setSettingsReady(true);
+				return;
+			}
+			if ('presetId' in s) {
+				setSettings(DEFAULT_SETTINGS);
+				setSettingsReady(true);
+				return;
+			}
 			const raw = s as AppSettings & { model?: Partial<AppSettings['model']> };
 			setSettings({
 				...DEFAULT_SETTINGS, ...raw,
@@ -109,7 +117,8 @@ function AppInner() {
 					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
 					modelId: raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId,
 					provider: raw.model?.provider ?? DEFAULT_SETTINGS.model.provider,
-					apiKey: raw.model?.apiKey ?? DEFAULT_SETTINGS.model.apiKey,
+					// Keep disk key as-is — never fall back to a placeholder that overwrites the file.
+					apiKey: typeof raw.model?.apiKey === 'string' ? raw.model.apiKey : '',
 				},
 				layout: { ...DEFAULT_SETTINGS.layout, ...raw.layout },
 				workspace: {
@@ -121,10 +130,14 @@ function AppInner() {
 				},
 				theme: raw.theme ?? DEFAULT_SETTINGS.theme,
 			});
-		});
+			setSettingsReady(true);
+		}).catch(() => setSettingsReady(true));
 	}, []);
 
-	useEffect(() => { copix.setSettings(settings); }, [settings]);
+	useEffect(() => {
+		if (!settingsReady) return;
+		void copix.setSettings(settings);
+	}, [settings, settingsReady]);
 
 	useEffect(() => {
 		const mq = window.matchMedia('(prefers-color-scheme: light)');

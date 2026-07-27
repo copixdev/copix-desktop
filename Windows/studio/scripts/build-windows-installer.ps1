@@ -5,13 +5,9 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 Write-Host "Copix Windows installer build" -ForegroundColor Cyan
 Write-Host "Working directory: $(Get-Location)"
 
-if (-not (Test-Path 'node_modules\electron-builder')) {
-    Write-Host "[1/3] Installing dependencies (including electron-builder)..." -ForegroundColor Yellow
-    npm install
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-} else {
-    Write-Host "[1/3] Dependencies present" -ForegroundColor Green
-}
+Write-Host "[1/3] Installing dependencies..." -ForegroundColor Yellow
+npm install
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "[2/3] Building app + packaging NSIS installer..." -ForegroundColor Yellow
 npm run dist

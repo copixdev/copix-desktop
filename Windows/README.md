@@ -109,14 +109,33 @@ Use the in-app chat; edit **~/Copix/settings.json** to change model, theme, work
 
 ## Build
 
-**Requirements** : Node.js (`npm`)
+**Requirements:** Node.js (`npm`). NSIS installer (`.exe`) must be built on **Windows** (or Linux with working Wine + wine32).
+
+From the `Windows/` folder:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1    #dependencies + app
+cd studio
+powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
 ```
 
 Output: `studio\release\Copix-Setup-<version>-x64.exe`
-Running : `Copix.exe`
+
+Portable (no installer): `cd studio && npm run dist:dir` → `release\staging\win-unpacked\Copix.exe`
+
+## Folder layout
+
+```
+Windows/
+├── copix-studio.bat      # Start dev server
+├── package.json          # npm run dist / studio
+├── studio/               # Electron app source
+│   ├── electron/
+│   ├── src/
+│   ├── scripts/          # build-windows-installer.ps1
+│   ├── build/            # Icons
+│   └── release/          # Installers after build
+└── LICENSE.txt
+```
 
 ## Download
 

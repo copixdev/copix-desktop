@@ -6,6 +6,7 @@
   "author": "EJH-BAE",
   "license": "MIT",
   "scripts": {
+    "build": "npm run dist --prefix studio",
     "dist": "npm run dist --prefix studio",
     "dist:dir": "npm run dist:dir --prefix studio",
     "dist:mac": "npm run dist --prefix studio",

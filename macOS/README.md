@@ -107,14 +107,37 @@ The folder and file are created the first time you change Settings. Changing mod
 
 Use the in-app chat; edit **~/Copix/settings.json** to change model, theme, workspace, or agent mode, then restart Copix.
 
+## Folder layout
+
+```
+macOS/
+├── copix-studio.sh       # Start dev server
+├── package.json          # npm run dist / studio (delegates to studio/)
+├── studio/               # Electron app source
+│   ├── electron/         # Main process + preload
+│   ├── src/              # React UI
+│   ├── scripts/          # build-mac.sh, install-electron, icons
+│   ├── build/            # App icons, entitlements
+│   └── release/          # Installers (.dmg, .zip) after build
+├── policies/             # Optional policy notes
+└── LICENSE.txt
+```
+
+User settings (not in this repo): `~/Copix/settings.json`
+
 ## Build
 
 **Requirements:** macOS + Node.js (`npm`)
 
-Copix macOS build (for `/Users/{username}`):
+From the `macOS/` folder:
 
 ```bash
-cd studio
+./tools/build-mac.sh
+```
+
+Or from `macOS/studio/`:
+
+```bash
 ./scripts/build-mac.sh
 ```
 
@@ -127,7 +150,7 @@ cd studio && npm install && npm run dist
 Output: `studio/release/Copix-<version>-mac-arm64.dmg` (Apple Silicon) and/or `…-mac-x64.dmg` (Intel)  
 Running: open `Copix.app`, or drag it to Applications
 
-Recommended `workspace.homeDirectory`: `/Users/{username}`
+Recommended `workspace.homeDirectory` in settings.json: `/Users/{username}`
 
 ## Download
 

@@ -14,6 +14,7 @@ import { inferWorkspaceEnv } from './models/agentModes';
 import { IconPlus, IconBranch } from './components/Icons';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
+import { subscribeAgentTerminal } from './utils/terminalBridge';
 
 function resolveTheme(pref: ThemePreference, systemLight: boolean): 'light' | 'dark' {
 	if (pref === 'system') return systemLight ? 'light' : 'dark';
@@ -63,6 +64,15 @@ function AppInner() {
 	const displayedFileChanges = reviewFiles ?? fileChanges;
 
 	useEffect(() => { setReviewFiles(null); }, [activeSessionId]);
+
+	useEffect(() => {
+		return subscribeAgentTerminal(event => {
+			if (event.type === 'start') {
+				setEditorVisible(true);
+				setPanelMode('terminal');
+			}
+		});
+	}, []);
 
 	useEffect(() => { saveSessions(sessions); }, [sessions]);
 

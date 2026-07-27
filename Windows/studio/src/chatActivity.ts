@@ -79,9 +79,11 @@ export function summarizeWorkflow(activities: ChatActivity[]): WorkflowSummary {
 const TOOL_KIND: Record<string, ActivityKind> = {
 	read_file: 'read',
 	write_file: 'edit',
+	append_file: 'edit',
 	edit_file: 'edit',
 	delete_file: 'edit',
 	grep: 'search',
+	terminal: 'run',
 	run_terminal: 'run',
 	list_dir: 'list',
 	create_project: 'create',
@@ -97,12 +99,14 @@ export function extractTarget(tool: string, args: Record<string, unknown>): stri
 	switch (tool) {
 		case 'read_file':
 		case 'write_file':
+		case 'append_file':
 		case 'edit_file':
 		case 'delete_file':
 		case 'list_dir':
 			return args.path ? displayTarget(String(args.path)) : undefined;
 		case 'grep':
 			return args.pattern ? truncate(String(args.pattern), 56) : undefined;
+		case 'terminal':
 		case 'run_terminal':
 			return args.command ? truncate(String(args.command), 56) : undefined;
 		case 'create_project':
@@ -120,12 +124,14 @@ export function extractFullTarget(tool: string, args: Record<string, unknown>): 
 	switch (tool) {
 		case 'read_file':
 		case 'write_file':
+		case 'append_file':
 		case 'edit_file':
 		case 'delete_file':
 		case 'list_dir':
 			return args.path ? String(args.path) : undefined;
 		case 'grep':
 			return args.pattern ? String(args.pattern) : undefined;
+		case 'terminal':
 		case 'run_terminal':
 			return args.command ? String(args.command) : undefined;
 		case 'multitask':

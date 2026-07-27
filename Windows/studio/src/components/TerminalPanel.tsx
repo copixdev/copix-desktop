@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { copix } from '../api';
+import { subscribeAgentTerminal } from '../utils/terminalBridge';
 
 interface Props {
 	workspace?: string;
@@ -42,6 +43,40 @@ export function TerminalPanel({ workspace }: Props) {
 			...prev,
 			{ id: ++lineId, kind: 'meta', text: `cwd → ${shortCwd(workspace)}` },
 		]);
+	}, [workspace]);
+
+	useEffect(() => {
+		const agentOutLines = new Map<string, number>();
+		return subscribeAgentTerminal(event => {
+			if (event.type === 'start') {
+				const metaId = ++lineId;
+				const inId = ++lineId;
+				const outId = ++lineId;
+				agentOutLines.set(event.streamId, outId);
+				setLines(prev => [
+					...prev,
+					{ id: metaId, kind: 'meta', text: '[agent]' },
+					{ id: inId, kind: 'in', text: `PS ${shortCwd(event.cwd ?? workspace)}> ${event.command}` },
+					{ id: outId, kind: 'out', text: '' },
+				]);
+				return;
+			}
+			if (event.type === 'output') {
+				const outId = agentOutLines.get(event.streamId);
+				if (outId == null) return;
+				setLines(prev => prev.map(l => l.id === outId ? { ...l, text: l.text + event.chunk } : l));
+				return;
+			}
+			if (event.type === 'end') {
+				const outId = agentOutLines.get(event.streamId);
+				if (outId == null) return;
+				setLines(prev => prev.map(l => {
+					if (l.id !== outId) return l;
+					return { ...l, text: l.text.trim() ? l.text : (event.result || '(no output)') };
+				}));
+				agentOutLines.delete(event.streamId);
+			}
+		});
 	}, [workspace]);
 
 	const run = async (cmd: string) => {

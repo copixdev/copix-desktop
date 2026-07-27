@@ -6,6 +6,7 @@ import { buildSystemPrompt } from './systemPrompt.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
 import { assertSafeFilePath } from '../utils/secrets.js';
+import { emitAgentTerminal } from '../utils/terminalBridge.js';
 import { isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
 
 export interface AgentContext {
@@ -18,6 +19,18 @@ export interface AgentContext {
 interface MultitaskItem {
 	tool: string;
 	args?: Record<string, unknown>;
+}
+
+const TERMINAL_TOOL_ALIASES = new Set(['terminal', 'run_terminal', 'shell', 'bash', 'exec', 'run_command']);
+
+function normalizeToolName(name: string): string {
+	return TERMINAL_TOOL_ALIASES.has(name) ? 'terminal' : name;
+}
+
+function fileStats(content: string): string {
+	const lines = content.split('\n').length;
+	const bytes = new TextEncoder().encode(content).length;
+	return `${lines} lines, ${bytes} bytes`;
 }
 
 const TOOLS = [
@@ -52,7 +65,7 @@ Scaffold a new git-initialized project folder.
 		function: {
 			name: 'multitask',
 			description: `## multitask
-Run **independent** tool calls in parallel (reads, greps, list_dir, run_terminal).
+Run **independent** tool calls in parallel (reads, greps, list_dir, terminal).
 
 **When to use:** Several lookups that do not depend on each other's results.
 
@@ -68,7 +81,7 @@ Run **independent** tool calls in parallel (reads, greps, list_dir, run_terminal
 						items: {
 							type: 'object',
 							properties: {
-								tool: { type: 'string', enum: ['read_file', 'grep', 'list_dir', 'run_terminal'] },
+								tool: { type: 'string', enum: ['read_file', 'grep', 'list_dir', 'terminal'] },
 								args: { type: 'object' },
 							},
 							required: ['tool'],
@@ -101,9 +114,13 @@ Surgical search-and-replace in an existing file.
 
 **Prefer over** \`write_file\` for small, targeted changes.
 
+**Tips:**
+- Copy \`old_string\` exactly from \`read_file\` output (whitespace matters)
+- Include 2–3 surrounding lines so the match is unique
+
 **Parameters:**
 - \`path\` — file to edit
-- \`old_string\` — exact text to find (include enough context to be unique)
+- \`old_string\` — exact text to find
 - \`new_string\` — replacement text
 - \`replace_all\` — replace every occurrence (default: first only)`,
 			parameters: {
@@ -123,14 +140,46 @@ Surgical search-and-replace in an existing file.
 		function: {
 			name: 'write_file',
 			description: `## write_file
-Create or **fully overwrite** a file. Parent directories are created automatically.
+Create or **fully overwrite** a file on the user's local machine.
 
-**When to use:** New files or complete rewrites.
+**When to use:** New files or complete rewrites. Parent directories are created automatically.
 
-**Parameters:** \`path\`, \`content\` (full file body).`,
+**Tips:**
+- Provide the **complete** file body in \`content\`
+- Write one file per call; verify with \`read_file\` if needed
+- Prefer \`edit_file\` for small changes to existing files
+
+**Parameters:**
+- \`path\` — workspace-relative or absolute path
+- \`content\` — full file contents (UTF-8 text)`,
 			parameters: {
 				type: 'object',
-				properties: { path: { type: 'string' }, content: { type: 'string' } },
+				properties: {
+					path: { type: 'string', description: 'File path relative to workspace or absolute' },
+					content: { type: 'string', description: 'Complete file body to write' },
+				},
+				required: ['path', 'content'],
+			},
+		},
+	},
+	{
+		type: 'function' as const,
+		function: {
+			name: 'append_file',
+			description: `## append_file
+Append text to the end of an existing file (or create it if missing).
+
+**When to use:** Add lines to logs, configs, or incrementally build a file.
+
+**Parameters:**
+- \`path\` — file to append to
+- \`content\` — text to append (a newline is added automatically if the file does not end with one)`,
+			parameters: {
+				type: 'object',
+				properties: {
+					path: { type: 'string' },
+					content: { type: 'string' },
+				},
 				required: ['path', 'content'],
 			},
 		},
@@ -185,21 +234,23 @@ List files and folders in a directory.
 	{
 		type: 'function' as const,
 		function: {
-			name: 'run_terminal',
-			description: `## run_terminal
-Execute a ${shellLabel()} command on the user's machine.
+			name: 'terminal',
+			description: `## terminal
+Run a **local shell command** on the user's machine (${shellLabel()}). Output streams live in Copix's integrated terminal.
 
-**When to use:** Build, test, install packages, run scripts.
+**When to use:** Install packages, run builds/tests, git, npm, pip, mkdir, scaffolding CLIs, inspect environment.
+
+**Local access:** Commands run in the workspace directory by default. You have full local shell access unless the user declines elevation.
 
 **Parameters:**
-- \`command\` (required)
-- \`cwd\` — working directory (defaults to workspace)
-- \`elevate\` — \`true\` for ${isWindows() ? 'Administrator / UAC' : 'administrator / sudo'} (installs, system paths)`,
+- \`command\` (required) — shell command to execute
+- \`cwd\` — working directory (defaults to workspace root)
+- \`elevate\` — \`true\` for ${isWindows() ? 'Administrator / UAC' : 'administrator / sudo'} (system installs, protected paths)`,
 			parameters: {
 				type: 'object',
 				properties: {
-					command: { type: 'string' },
-					cwd: { type: 'string' },
+					command: { type: 'string', description: 'Shell command to run locally' },
+					cwd: { type: 'string', description: 'Working directory (defaults to workspace)' },
 					elevate: {
 						type: 'boolean',
 						description: isWindows()
@@ -262,13 +313,36 @@ export type AgentCallbacks = {
 	onStructuredResponse?: (parsed: StructuredAgentResponse) => void;
 };
 
+async function runTerminalCommand(
+	args: Record<string, unknown>,
+	ws: string,
+): Promise<ToolResultMeta> {
+	const command = String(args.command ?? args.cmd ?? '').trim();
+	if (!command) return { result: 'terminal requires a command' };
+	const elevate = Boolean(args.elevate) || needsElevateHint(command);
+	const cwd = args.cwd ? String(args.cwd) : ws;
+	const streamId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+	emitAgentTerminal({ type: 'start', streamId, command, cwd });
+	const stop = copix.onTerminalOutput(streamId, chunk => {
+		emitAgentTerminal({ type: 'output', streamId, chunk });
+	});
+	try {
+		const out = await copix.runTerminal(command, ws, cwd, elevate, streamId);
+		emitAgentTerminal({ type: 'end', streamId, result: out });
+		return { result: truncateText(out.trim() || '(no output)', 8000) };
+	} finally {
+		stop();
+	}
+}
+
 async function executeTool(
 	name: string,
 	args: Record<string, unknown>,
 	ctx: AgentContext,
 ): Promise<ToolResultMeta> {
 	const ws = ctx.workspaceRoot;
-	switch (name) {
+	const tool = normalizeToolName(name);
+	switch (tool) {
 		case 'create_project': {
 			const projectName = String(args.name ?? 'project');
 			assertSafeFilePath(projectName);
@@ -286,7 +360,7 @@ async function executeTool(
 			const summary = args.summary ? String(args.summary) : 'parallel tasks';
 			const results = await Promise.all(tasks.map(async (t, i) => {
 				try {
-					const meta = await executeTool(t.tool, t.args ?? {}, ctx);
+					const meta = await executeTool(normalizeToolName(t.tool), t.args ?? {}, ctx);
 					return `[${i + 1}] ${t.tool}: OK\n${truncateText(meta.result, 800)}`;
 				} catch (err) {
 					const msg = err instanceof Error ? err.message : String(err);
@@ -309,7 +383,11 @@ async function executeTool(
 			const replaceAll = Boolean(args.replace_all);
 			const before = await copix.readFile(filePath, ws);
 			if (!before.includes(oldStr)) {
-				return { result: `Could not find old_string in ${filePath}` };
+				const preview = before.slice(0, 500);
+				return {
+					result: `Could not find old_string in ${filePath}.`
+						+ ` Copy text exactly from read_file (whitespace matters).\n\nFile starts with:\n${preview}${before.length > 500 ? '\n…' : ''}`,
+				};
 			}
 			const after = replaceAll ? before.split(oldStr).join(newStr) : before.replace(oldStr, newStr);
 			const saved = await copix.writeFile(filePath, after, ws);
@@ -325,7 +403,22 @@ async function executeTool(
 			} catch { /* new file */ }
 			const saved = await copix.writeFile(filePath, newContent, ws);
 			const diff = computeLineDiff(before, newContent);
-			return { result: `Saved ${saved}`, diff };
+			const verb = before ? 'Overwrote' : 'Created';
+			return { result: `${verb} ${saved} (${fileStats(newContent)})`, diff };
+		}
+		case 'append_file': {
+			const filePath = String(args.path ?? '');
+			assertSafeFilePath(filePath);
+			const chunk = String(args.content ?? '');
+			let before = '';
+			try {
+				before = await copix.readFile(filePath, ws);
+			} catch { /* new file */ }
+			const needsNl = before.length > 0 && !before.endsWith('\n');
+			const after = `${before}${needsNl ? '\n' : ''}${chunk}`;
+			const saved = await copix.writeFile(filePath, after, ws);
+			const diff = computeLineDiff(before, after);
+			return { result: `Appended to ${saved} (${fileStats(chunk)} added)`, diff };
 		}
 		case 'delete_file': {
 			const filePath = String(args.path ?? '');
@@ -345,16 +438,8 @@ async function executeTool(
 			const entries = await copix.listDir(args.path ? String(args.path) : undefined, ws);
 			return { result: entries.join('\n') || '(empty)' };
 		}
-		case 'run_terminal': {
-			const elevate = Boolean(args.elevate) || needsElevateHint(String(args.command ?? ''));
-			const out = await copix.runTerminal(
-				String(args.command ?? ''),
-				ws,
-				args.cwd ? String(args.cwd) : undefined,
-				elevate,
-			);
-			return { result: truncateText(out, 4000) };
-		}
+		case 'terminal':
+			return runTerminalCommand(args, ws);
 		case 'spawn_subagent': {
 			const prompt = String(args.prompt ?? '').trim();
 			if (!prompt) return { result: 'spawn_subagent requires a prompt' };
@@ -366,7 +451,7 @@ async function executeTool(
 			return { result: `Subagent started (${sessionId}). It will run the delegated task in a new agent session.` };
 		}
 		default:
-			return { result: `Unknown tool: ${name}` };
+			return { result: `Unknown tool: ${name}${name !== tool ? ` (normalized: ${tool})` : ''}` };
 	}
 }
 
@@ -619,14 +704,14 @@ export async function runAgent(
 					});
 					continue;
 				}
-				callbacks.onToolStart(call.id, call.name, args);
+				callbacks.onToolStart(call.id, normalizeToolName(call.name), args);
 				let meta: ToolResultMeta;
 				try {
 					meta = await executeTool(call.name, args, ctx);
 				} catch (err) {
 					meta = { result: err instanceof Error ? err.message : String(err) };
 				}
-				callbacks.onToolEnd(call.id, call.name, args, meta);
+				callbacks.onToolEnd(call.id, normalizeToolName(call.name), args, meta);
 				messages.push({ role: 'tool', content: meta.result, tool_call_id: call.id, name: call.name });
 			}
 		} catch (err) {

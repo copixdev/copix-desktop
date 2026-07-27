@@ -1,6 +1,6 @@
 import type { AgentMode } from './agentModes.js';
 import { getAgentMode } from './agentModes.js';
-import { projectPathExample } from '../utils/platform.js';
+import { projectPathExample, shellLabel } from '../utils/platform.js';
 
 export const DEFAULT_RULES = [
 	'Read files before editing. Use tools proactively.',
@@ -10,6 +10,7 @@ export const DEFAULT_RULES = [
 	'Never use API keys, tokens, or secrets as filenames or paths.',
 	`New projects go in the user home folder (e.g. \`${projectPathExample()}\`).`,
 	'Use `edit_file` for small patches; `write_file` only for new files or full rewrites.',
+	`Use the \`terminal\` tool to run local ${shellLabel()} commands (builds, installs, git, tests).`,
 ];
 
 const MODE_RULES: Record<AgentMode, string[]> = {
@@ -23,14 +24,16 @@ const MODE_RULES: Record<AgentMode, string[]> = {
 		'When starting a new project with no repo, call `create_project` with a kebab-case name you generate.',
 		'When creating multiple files, write them one at a time — finish each `write_file` before starting the next.',
 		'Keep working with tools until the task is complete; do not stop after the first file.',
+		'Run builds and tests with `terminal` after making changes.',
 	],
 	debug: [
-		'Reproduce the issue, form hypotheses, and validate with terminal or grep.',
+		'Reproduce the issue, form hypotheses, and validate with `terminal` or `grep`.',
 		'Prefer minimal fixes that address root cause, not symptoms.',
 	],
 	terminal: [
-		'Prefer shell commands for environment setup, builds, and automation.',
-		'Use `elevate=true` on `run_terminal` when administrator / sudo access is required.',
+		'Prefer `terminal` for environment setup, builds, package installs, and automation.',
+		'Use `elevate=true` on `terminal` when administrator / sudo access is required.',
+		'Combine shell output with `read_file` / `edit_file` when fixing code issues.',
 	],
 };
 
@@ -68,11 +71,12 @@ function toolGuidance(): string {
 | \`create_project\` | New repo under user home (\`${projectPathExample('<name>')}\`) |
 | \`read_file\` | Inspect source before editing |
 | \`edit_file\` | Surgical search-and-replace in existing files |
-| \`write_file\` | New files or full rewrites |
+| \`write_file\` | New files or full rewrites (complete content) |
+| \`append_file\` | Add text to end of a file |
 | \`delete_file\` | Remove a file |
 | \`grep\` | Search codebase (ripgrep) |
 | \`list_dir\` | Explore folder structure |
-| \`run_terminal\` | Build, test, install packages (\`elevate=true\` for admin/sudo) |
+| \`terminal\` | **Local shell** — build, test, install, git, npm (\`elevate=true\` for admin/sudo) |
 | \`multitask\` | Parallel independent reads/searches |
 | \`spawn_subagent\` | Delegate a large isolated task to a child agent |
 
@@ -111,6 +115,7 @@ ${rules.map(r => `- ${r}`).join('\n')}
 - **Root:** \`${opts.workspaceRoot}\`
 - Relative paths are relative to this root.
 - Absolute paths work anywhere on the machine.
+- **Local shell:** you may run commands on the user's machine via \`terminal\`.
 
 ${toolGuidance()}
 

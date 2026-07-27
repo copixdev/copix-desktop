@@ -14,7 +14,11 @@ const ACTION_ALIASES: Record<string, string> = {
 	write_script: 'write_file',
 	edit_script: 'edit_file',
 	read_script: 'read_file',
-	run_command: 'run_terminal',
+	run_command: 'terminal',
+	run_terminal: 'terminal',
+	shell: 'terminal',
+	terminal_command: 'terminal',
+	append: 'append_file',
 	spawn_agent: 'spawn_subagent',
 	delegate: 'spawn_subagent',
 };
@@ -88,11 +92,20 @@ export function actionToTool(action: AgentAction): { tool: string; args: Record<
 			return { tool, args: { pattern: opt.pattern ?? opt.query, path: opt.path } };
 		case 'list_dir':
 			return { tool, args: { path: opt.path } };
-		case 'run_terminal':
+		case 'append_file':
 			return {
 				tool,
 				args: {
-					command: opt.command ?? opt.detail,
+					path: opt.path ?? opt.file ?? opt.filename,
+					content: opt.content ?? opt.detail ?? opt.text ?? '',
+				},
+			};
+		case 'run_terminal':
+		case 'terminal':
+			return {
+				tool: 'terminal',
+				args: {
+					command: opt.command ?? opt.cmd ?? opt.detail,
 					cwd: opt.cwd,
 					elevate: Boolean(opt.elevate),
 				},

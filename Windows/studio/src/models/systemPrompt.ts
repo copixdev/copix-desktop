@@ -6,14 +6,17 @@ import { isReadOnlyTask } from './modelSelector.js';
 
 export const DEFAULT_RULES = [
 	'**Follow the user\'s latest message exactly.** Do what they asked — not a broader or different task.',
+	'**Accuracy over speed.** Take the time to read, verify, and finish the full task before replying.',
+	'**Multi-turn work:** When the user sends a follow-up ("yes", "continue", "enhance", etc.), continue from prior chat history — do not restart or duplicate work already done.',
 	'If the user asks to inspect, explain, review, or understand — read the workspace and answer in chat. Do NOT create or modify files.',
 	'Never call `create_project` unless the user explicitly asks for a brand-new project from scratch.',
 	'Never call `create_project` when the workspace already has files — use `list_dir` and `read_file` instead.',
-	'Use the **minimum** tools needed. Skip tools when you can answer from context.',
+	'Use the **minimum** tools needed, but use as many rounds as needed to **complete** the task.',
 	'Read files before editing. Prefer `edit_file` over `write_file` for small changes.',
 	'Never invent file paths — verify with `list_dir` or `grep` first.',
 	'Never use API keys, tokens, or secrets as filenames or paths.',
-	`Use the \`terminal\` tool only when shell commands are required.`,
+	'Do **not** run `mkdir` for paths you will create with `write_file` — parent directories are created automatically.',
+	`Use the \`terminal\` tool only when shell commands are required (build, test, install, git — not mkdir).`,
 ];
 
 const MODE_RULES: Record<AgentMode, string[]> = {
@@ -26,8 +29,9 @@ const MODE_RULES: Record<AgentMode, string[]> = {
 		'Implement working code only when the user asks you to build or change something.',
 		'When the user asks a question about existing code, explain it — do not scaffold new projects.',
 		'When starting a new project with no repo and the user explicitly requests it, call `create_project` once.',
-		'When creating multiple files, write them one at a time.',
-		'Run builds and tests with `terminal` after making changes.',
+		'When creating multiple files, write them **one at a time** but **keep going** until every file is done — do not stop after the first file.',
+		'After each file, continue with the next until the task is fully complete, then summarize.',
+		'Run builds and tests with `terminal` after making changes when appropriate.',
 	],
 	debug: [
 		'Reproduce the issue, form hypotheses, and validate with `terminal` or `grep`.',
@@ -48,26 +52,21 @@ const READ_ONLY_RULES = [
 
 const RESPONSE_GUIDANCE = `## Response workflow
 
-1. **Understand the request** — re-read the user message. Match their intent (explain vs build vs fix).
-2. **While working** — use only the tools required. Reasoning stays in the thinking panel.
-3. **When finished** — send a **final markdown reply** for the user:
+1. **Understand the request** — re-read the user message and prior chat. Match their intent (explain vs build vs fix vs continue).
+2. **While working** — use tools until the task is **fully done**. Do not stop mid-task to ask permission unless blocked.
+3. **Follow-ups** — if the user says "yes", "continue", or "enhance", pick up where you left off. Read existing files first; do not recreate or duplicate.
+4. **When finished** — send a **final markdown reply** for the user:
    - What you investigated and accomplished
    - Files read or changed (with brief rationale)
    - Clear answer to their question
-   - Next steps if relevant
+   - Next steps only if genuinely blocked
 
 Never end a turn with only tool calls and no user-facing message.
+Never end a turn with only a plan when the user asked you to implement.
 
-### Structured JSON (optional)
+### Tool preference
 
-For batching **write** actions only (not for inspect/explain tasks):
-
-\`\`\`json
-{
-  "message": "Detailed markdown summary for the user.",
-  "actions": [{ "type": "write_file", "options": { "path": "src/app.tsx", "content": "..." } }]
-}
-\`\`\``;
+Prefer native **tool_calls** (one tool per round is fine). Use structured JSON only as a last resort.`;
 
 function toolGuidance(readOnly: boolean): string {
 	if (readOnly) {

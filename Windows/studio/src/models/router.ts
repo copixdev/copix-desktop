@@ -4,7 +4,7 @@ import { copix } from '../api.js';
 import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import type { TaskKind } from './modelCatalog.js';
-import { inferTaskKind, isReadOnlyTask } from './modelSelector.js';
+import { inferTaskKind, isContinuationMessage, isReadOnlyTask } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
 import { assertSafeFilePath } from '../utils/secrets.js';
@@ -250,7 +250,7 @@ List files and folders in a directory.
 			description: `## terminal
 Run a **local shell command** on the user's machine (${shellLabel()}). Output streams live in Copix's integrated terminal.
 
-**When to use:** Install packages, run builds/tests, git, npm, pip, mkdir, scaffolding CLIs, inspect environment.
+**When to use:** Install packages, run builds/tests, git, npm, pip, scaffolding CLIs, inspect environment. Do NOT use for directory creation — use write_file instead (dirs are auto-created).
 
 **Local access:** Commands run in the workspace directory by default. You have full local shell access unless the user declines elevation.
 
@@ -401,7 +401,7 @@ async function executeTool(
 			const filePath = String(args.path ?? '');
 			assertSafeFilePath(filePath);
 			const content = await copix.readFile(filePath, ws);
-			return { result: truncateText(content, 4000) };
+			return { result: truncateText(content, 8000) };
 		}
 		case 'edit_file': {
 			const filePath = String(args.path ?? '');
@@ -460,7 +460,7 @@ async function executeTool(
 				args.path ? String(args.path) : undefined,
 				ws,
 			);
-			return { result: truncateText(out, 4000) };
+			return { result: truncateText(out, 8000) };
 		}
 		case 'list_dir': {
 			const entries = await copix.listDir(args.path ? String(args.path) : undefined, ws);
@@ -519,13 +519,34 @@ const SUMMARY_USER_PROMPT = `Provide a detailed markdown summary for the user:
 Do not call tools. Write clearly for the user.`;
 
 const CONTINUE_USER_PROMPT = `Continue the task from where you left off.
+- Read existing files first — do not recreate work already done.
 - Create or edit any remaining files with tools.
-- Do not stop until the work is complete or you need user input.
+- Do not stop until the work is complete or you are genuinely blocked and need user input.
 - When finished, reply with a clear markdown summary for the user.`;
 
-const MAX_AGENT_ROUNDS = 20;
-const MAX_HISTORY_TURNS = 12;
-const MAX_MESSAGE_CHARS = 8000;
+const MAX_AGENT_ROUNDS = 40;
+const MAX_HISTORY_TURNS = 24;
+const MAX_MESSAGE_CHARS = 12000;
+const MAX_EMPTY_REPLY_RETRIES = 4;
+const MAX_INCOMPLETE_RETRIES = 4;
+
+function looksLikePlanningOnly(text: string): boolean {
+	const t = text.trim();
+	if (!t) return true;
+	return /\b(I will|I'll|let me|first,? I'll|step 1|plan to|going to|next I)\b/i.test(t)
+		&& !/\b(created|updated|wrote|edited|done|complete|finished|saved|wrote to)\b/i.test(t);
+}
+
+function looksLikePartialCompletion(text: string): boolean {
+	return /\b(next|remaining|still need|will also|not yet|partially|one more|another file|TODO)\b/i.test(text);
+}
+
+function augmentUserMessage(userMessage: string, priorMessages: Array<{ role: string; content: string }>): string {
+	if (!isContinuationMessage(userMessage) || !priorMessages.length) return userMessage;
+	return `${userMessage}
+
+[Continue the work from our previous conversation. Read what was already done in the chat history and workspace, then finish any remaining steps. Do not restart from scratch or repeat mkdir/setup already completed.]`;
+}
 
 async function streamCompletion(
 	messages: ChatMsg[],
@@ -550,18 +571,18 @@ async function streamCompletion(
 			messages,
 			...(opts.tools ? { tools: opts.tools } : {}),
 			stream: true,
-			temperature: 0.1,
-			max_tokens: config.numPredict ?? 8192,
+			temperature: 0.05,
+			max_tokens: config.numPredict ?? 16384,
 		}
 		: {
 			model: config.model,
 			messages,
 			...(opts.tools ? { tools: opts.tools } : {}),
 			stream: true,
-			temperature: 0.1,
+			temperature: 0.05,
 			options: {
-				...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 8192 }),
-				num_predict: config.numPredict ?? 8192,
+				...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 16384 }),
+				num_predict: config.numPredict ?? 16384,
 				num_batch: 512,
 				keep_alive: '30m',
 			},
@@ -664,6 +685,7 @@ export async function runAgent(
 	const mode = options.mode ?? 'code';
 	const taskKind = options.taskKind ?? inferTaskKind(userMessage, mode);
 	const activeTools = toolsForTask(taskKind);
+	const effectiveUserMessage = augmentUserMessage(userMessage, priorMessages);
 
 	const messages: ChatMsg[] = [
 		{
@@ -672,16 +694,17 @@ export async function runAgent(
 				mode,
 				workspaceRoot: ctx.workspaceRoot,
 				taskKind,
-				userMessage,
+				userMessage: effectiveUserMessage,
 			}),
 		},
 		...historyToMessages(priorMessages, MAX_HISTORY_TURNS),
-		{ role: 'user', content: userMessage },
+		{ role: 'user', content: effectiveUserMessage },
 	];
 
 	const maxRounds = MAX_AGENT_ROUNDS;
 	let hadToolUse = false;
 	let emptyReplyRetries = 0;
+	let incompleteRetries = 0;
 
 	for (let i = 0; i < maxRounds; i++) {
 		if (signal.aborted) return;
@@ -694,7 +717,7 @@ export async function runAgent(
 			if (!toolCalls.size) {
 				const parsed = parseStructuredResponse(assistantText);
 				if (parsed) {
-					const displayMessage = parsed.message || '(done)';
+					const displayMessage = parsed.message || '(executed actions)';
 					const actions = isReadOnlyTask(taskKind)
 						? parsed.actions.filter(a => {
 							const mapped = actionToTool(a);
@@ -702,24 +725,42 @@ export async function runAgent(
 						})
 						: parsed.actions;
 					if (actions.length) {
+						hadToolUse = true;
 						await executeStructuredActions({ ...parsed, actions }, ctx, callbacks);
 						callbacks.onClearText?.();
-						callbacks.onText(displayMessage);
-					} else {
-						callbacks.onStructuredResponse?.(parsed);
 						if (displayMessage) callbacks.onText(displayMessage);
+						messages.push({ role: 'assistant', content: displayMessage });
+						messages.push({ role: 'user', content: CONTINUE_USER_PROMPT });
+						emptyReplyRetries = 0;
+						continue;
 					}
+					callbacks.onStructuredResponse?.(parsed);
+					if (displayMessage) callbacks.onText(displayMessage);
 					messages.push({ role: 'assistant', content: displayMessage });
 					callbacks.onStatus('');
 					return;
 				}
 				if (!assistantText.trim() && hadToolUse) {
-					if (emptyReplyRetries < 2) {
+					if (emptyReplyRetries < MAX_EMPTY_REPLY_RETRIES) {
 						emptyReplyRetries++;
 						messages.push({ role: 'user', content: CONTINUE_USER_PROMPT });
 						continue;
 					}
 					break;
+				}
+				if (
+					!isReadOnlyTask(taskKind)
+					&& assistantText.trim()
+					&& (
+						(!hadToolUse && looksLikePlanningOnly(assistantText))
+						|| (hadToolUse && looksLikePartialCompletion(assistantText))
+					)
+					&& incompleteRetries < MAX_INCOMPLETE_RETRIES
+				) {
+					incompleteRetries++;
+					messages.push({ role: 'assistant', content: assistantText });
+					messages.push({ role: 'user', content: CONTINUE_USER_PROMPT });
+					continue;
 				}
 				messages.push({ role: 'assistant', content: assistantText });
 				callbacks.onStatus('');

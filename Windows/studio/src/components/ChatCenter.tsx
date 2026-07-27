@@ -43,6 +43,7 @@ import { AgentErrorCard } from './AgentErrorCard';
 import { UserPromptPill } from './UserPromptPill';
 import { FilesChangedCard, type FileChange } from './FilesChangedCard';
 import { collectFileChanges } from '../utils/fileChanges';
+import { chatMessagesToAgentHistory } from '../utils/agentHistory';
 import { AgentWorkflowCard, liveStatusFromActivities } from './AgentWorkflowCard';
 import { ChatActivityList } from './ChatActivityList';
 
@@ -412,7 +413,7 @@ export function ChatCenter({
 					onSpawnSubagent,
 				},
 
-				messages.map(m => ({ role: m.role, content: m.content })),
+				chatMessagesToAgentHistory(messages),
 
 				abortRef.current.signal,
 

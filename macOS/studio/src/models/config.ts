@@ -13,10 +13,10 @@ import type { ModelProvider } from '../types.js';
 import { selectModelForTask } from './modelSelector.js';
 import type { ModelSettings } from '../types.js';
 
-export const DEFAULT_NUM_CTX = 8192;
-export const LOW_VRAM_NUM_CTX = 4096;
-export const DEFAULT_NUM_PREDICT = 8192;
-export const LOW_VRAM_NUM_PREDICT = 4096;
+export const DEFAULT_NUM_CTX = 16384;
+export const LOW_VRAM_NUM_CTX = 8192;
+export const DEFAULT_NUM_PREDICT = 16384;
+export const LOW_VRAM_NUM_PREDICT = 8192;
 
 export interface ModelConfig {
 	model: string;
@@ -38,7 +38,7 @@ export function settingsToConfig(model: ModelSettings, modelId?: string): ModelC
 			baseUrl: GROQ_BASE_URL,
 			provider: 'groq',
 			apiKey: model.apiKey?.trim(),
-			numPredict: 8192,
+			numPredict: 16384,
 		};
 	}
 

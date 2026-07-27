@@ -4,6 +4,7 @@ export interface ServerStatus {
 	online: boolean;
 	hasModel?: boolean;
 	models?: string[];
+	missing?: string[];
 }
 
 const api = {
@@ -39,6 +40,7 @@ const api = {
 	getServerStatus: () => ipcRenderer.invoke('copix:getServerStatus') as Promise<ServerStatus>,
 	startServer: () => ipcRenderer.invoke('copix:startServer') as Promise<{ ok: boolean; message: string }>,
 	pullOllamaModel: (model?: string) => ipcRenderer.invoke('copix:pullOllamaModel', model) as Promise<{ ok: boolean; message: string }>,
+	ensureCopixModels: () => ipcRenderer.invoke('copix:ensureCopixModels') as Promise<{ ok: boolean; message: string; pulled: string[] }>,
 	onPullProgress: (cb: (line: string) => void) => {
 		const handler = (_: unknown, line: string) => cb(line);
 		ipcRenderer.on('copix:pullProgress', handler);

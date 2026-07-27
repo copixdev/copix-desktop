@@ -11,6 +11,8 @@ import { ToastProvider } from './components/Toast';
 import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData, ChatSession, titleFromMessage } from './hooks/chatSessions';
 import { DEFAULT_SETTINGS, AppSettings, ThemePreference } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
+import { resolveModelConfig } from './models/config';
+import { formatModelChipLabel } from './models/modelSelector';
 import { IconPlus, IconBranch } from './components/Icons';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
@@ -44,6 +46,7 @@ function AppInner() {
 	const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 	const [tree, setTree] = useState<string[]>([]);
 	const [serverOnline, setServerOnline] = useState(false);
+	const [installedModels, setInstalledModels] = useState<string[]>([]);
 	const [editorVisible, setEditorVisible] = useState(true);
 	const [panelMode, setPanelMode] = useState<SidePanelMode>('hub');
 	const [reviewFiles, setReviewFiles] = useState<FileChange[] | null>(null);
@@ -62,6 +65,10 @@ function AppInner() {
 		[activeSession?.messages],
 	);
 	const displayedFileChanges = reviewFiles ?? fileChanges;
+	const statusBarModel = formatModelChipLabel(
+		settings.model,
+		resolveModelConfig(settings.model, settings.agentMode, installedModels).model,
+	);
 
 	useEffect(() => { setReviewFiles(null); }, [activeSessionId]);
 
@@ -86,6 +93,7 @@ function AppInner() {
 				model: {
 					...DEFAULT_SETTINGS.model,
 					...raw.model,
+					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
 					modelId: raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId,
 				},
 				layout: { ...DEFAULT_SETTINGS.layout, ...raw.layout },
@@ -116,10 +124,24 @@ function AppInner() {
 	}, [settings.theme]);
 
 	useEffect(() => {
-		const poll = () => copix.getServerStatus().then(s => setServerOnline(s.online));
+		const poll = () => copix.getServerStatus().then(s => {
+			setServerOnline(s.online);
+			setInstalledModels(s.models ?? []);
+		});
 		poll();
 		const t = setInterval(poll, 4000);
 		return () => clearInterval(t);
+	}, []);
+
+	useEffect(() => {
+		void copix.ensureCopixModels?.().then(r => {
+			if (r?.pulled?.length) {
+				return copix.getServerStatus().then(s => {
+					setServerOnline(s.online);
+					setInstalledModels(s.models ?? []);
+				});
+			}
+		}).catch(() => undefined);
 	}, []);
 
 	useEffect(() => {
@@ -457,7 +479,7 @@ function AppInner() {
 
 			<StatusBar
 				workspace={workspace}
-				model={settings.model.modelId}
+				model={statusBarModel}
 				online={serverOnline}
 			/>
 

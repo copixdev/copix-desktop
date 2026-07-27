@@ -1,5 +1,10 @@
 export const OLLAMA_BASE_URL = 'http://127.0.0.1:11434/v1';
-export const DEFAULT_MODEL_ID = 'qwen2.5:3b';
+export { FALLBACK_MODEL_ID as DEFAULT_MODEL_ID, COPIX_MODEL_IDS } from './modelCatalog.js';
+
+import type { AgentMode } from './agentModes.js';
+import { FALLBACK_MODEL_ID } from './modelCatalog.js';
+import { selectModelForTask } from './modelSelector.js';
+import type { ModelSettings } from '../types.js';
 
 /** Context window passed to Ollama as options.num_ctx. */
 export const DEFAULT_NUM_CTX = 8192;
@@ -20,15 +25,25 @@ export interface ModelConfig {
 	numGpu?: number;
 }
 
-export function settingsToConfig(model: { modelId: string; lowVram?: boolean }): ModelConfig {
+export function settingsToConfig(model: { modelId: string; lowVram?: boolean }, modelId?: string): ModelConfig {
 	const lowVram = Boolean(model.lowVram);
+	const resolved = modelId ?? (model.modelId || FALLBACK_MODEL_ID);
 	return {
-		model: model.modelId || DEFAULT_MODEL_ID,
+		model: resolved,
 		baseUrl: OLLAMA_BASE_URL,
 		numCtx: lowVram ? LOW_VRAM_NUM_CTX : DEFAULT_NUM_CTX,
 		numPredict: lowVram ? LOW_VRAM_NUM_PREDICT : DEFAULT_NUM_PREDICT,
 		numGpu: undefined,
 	};
+}
+
+export function resolveModelConfig(
+	model: ModelSettings,
+	agentMode: AgentMode,
+	installed: string[] = [],
+): ModelConfig {
+	const modelId = selectModelForTask(agentMode, model, installed);
+	return settingsToConfig(model, modelId);
 }
 
 export function resolveChatUrl(config: ModelConfig): string {

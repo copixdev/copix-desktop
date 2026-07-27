@@ -40,9 +40,13 @@ export interface WorkspaceSettings {
 
 export type ThemePreference = 'system' | 'dark' | 'light';
 
+export type ModelSelectionMode = 'auto' | 'manual';
+
 export interface ModelSettings {
+	/** Auto picks a model by agent mode; manual uses modelId. */
+	selection?: ModelSelectionMode;
 	modelId: string;
-	/** Safer local inference: smaller context, fewer GPU layers. */
+	/** Safer local inference: smaller context, prefers lighter models in auto mode. */
 	lowVram?: boolean;
 }
 
@@ -65,6 +69,7 @@ export const DEFAULT_WORKSPACE: WorkspaceSettings = {
 };
 
 export const DEFAULT_MODEL: ModelSettings = {
+	selection: 'auto',
 	modelId: 'qwen2.5:3b',
 	lowVram: false,
 };

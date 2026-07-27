@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent 
 
 import { runAgent } from '../models/router';
 
-import { settingsToConfig } from '../models/config';
+import { resolveModelConfig } from '../models/config';
+import { formatModelChipLabel } from '../models/modelSelector';
 
 import { copix } from '../api';
 
@@ -204,7 +205,7 @@ export function ChatCenter({
 
 	const [showScroll, setShowScroll] = useState(false);
 
-	const [server, setServer] = useState<{ online: boolean }>({ online: false });
+	const [server, setServer] = useState<{ online: boolean; models?: string[] }>({ online: false });
 
 	const [starting, setStarting] = useState(false);
 
@@ -222,10 +223,14 @@ export function ChatCenter({
 
 
 
-	const config = settingsToConfig(settings.model);
-
 	const [sessionMode, setSessionMode] = useState<AgentMode | null>(null);
 	const agentMode = sessionMode ?? settings.agentMode;
+
+	const config = useMemo(
+		() => resolveModelConfig(settings.model, agentMode, server.models ?? []),
+		[settings.model, agentMode, server.models],
+	);
+	const modelChipLabel = formatModelChipLabel(settings.model, config.model);
 
 	const modelReady = server.online;
 
@@ -331,7 +336,7 @@ export function ChatCenter({
 
 		if (!modelReady) {
 
-			toast('Start Ollama and pull qwen2.5:3b first', 'err');
+			toast('Start Ollama and wait for Copix models to download', 'err');
 
 			return;
 
@@ -592,7 +597,7 @@ export function ChatCenter({
 
 			{!modelReady && (
 				<div className="banner banner-warn">
-					<span>Ollama offline or model not pulled — edit ~/Copix/settings.json and run ollama pull qwen2.5:3b</span>
+					<span>Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models</span>
 					<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
 						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : 'Check Ollama'}
 					</button>
@@ -700,9 +705,9 @@ export function ChatCenter({
 
 			<div className="composer">
 				<div className="composer-meta">
-					<span className="model-chip" title="Model from ~/Copix/settings.json">
+					<span className="model-chip" title="Model selection from ~/Copix/settings.json (auto picks by task)">
 						<span className={`chip-dot ${modelReady ? 'on' : ''}`} />
-						<span className="chip-model">{config.model}</span>
+						<span className="chip-model">{modelChipLabel}</span>
 					</span>
 					<span className="composer-hint">
 						{workspace ? shortPath(workspace) : 'No workspace'}

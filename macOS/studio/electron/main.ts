@@ -6,9 +6,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-	isSensitiveWorkspacePath,
-	shouldHideWorkspaceEntry,
-} from '../src/utils/workspaceIgnore';
+	COPIX_MODEL_IDS,
+	FALLBACK_MODEL_ID,
+	missingCopixModels,
+	modelIsAvailable,
+} from '../src/models/modelCatalog.js';
 
 // Brand as Copix (not "Electron") in taskbar / Jump Lists / process UI.
 const APP_NAME = 'Copix';
@@ -49,24 +51,23 @@ function loadAppIcon(): Electron.NativeImage | undefined {
 let mainWindow: BrowserWindow | undefined;
 
 const OLLAMA_HOST = 'http://127.0.0.1:11434';
-const DEFAULT_OLLAMA_MODEL = 'qwen2.5:3b';
 
 async function fetchOllamaStatus(): Promise<{
 	online: boolean;
 	hasModel: boolean;
 	models: string[];
+	missing: string[];
 }> {
 	try {
 		const res = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: AbortSignal.timeout(3000) });
-		if (!res.ok) return { online: false, hasModel: false, models: [] };
+		if (!res.ok) return { online: false, hasModel: false, models: [], missing: [...COPIX_MODEL_IDS] };
 		const data = await res.json() as { models?: Array<{ name: string }> };
 		const names = (data.models ?? []).map(m => m.name);
-		const hasModel = names.some(n =>
-			n.startsWith(DEFAULT_OLLAMA_MODEL) || n.startsWith(DEFAULT_OLLAMA_MODEL.split(':')[0]),
-		);
-		return { online: true, hasModel, models: names };
+		const missing = missingCopixModels(names);
+		const hasModel = modelIsAvailable(FALLBACK_MODEL_ID, names);
+		return { online: true, hasModel, models: names, missing };
 	} catch {
-		return { online: false, hasModel: false, models: [] };
+		return { online: false, hasModel: false, models: [], missing: [...COPIX_MODEL_IDS] };
 	}
 }
 
@@ -74,12 +75,43 @@ async function fetchServerHealth(): Promise<{
 	online: boolean;
 	hasModel?: boolean;
 	models?: string[];
+	missing?: string[];
 }> {
 	const s = await fetchOllamaStatus();
 	return {
 		online: s.online && s.hasModel,
 		hasModel: s.hasModel,
 		models: s.models,
+		missing: s.missing,
+	};
+}
+
+async function ensureCopixModelsInternal(): Promise<{ ok: boolean; message: string; pulled: string[] }> {
+	const s = await fetchOllamaStatus();
+	if (!s.online) {
+		return { ok: false, message: 'Ollama offline — install from ollama.com and open the Ollama app', pulled: [] };
+	}
+	const pulled: string[] = [];
+	for (const model of s.missing) {
+		const result = await pullModelInternal(model);
+		if (result.ok) pulled.push(model);
+		else {
+			return {
+				ok: pulled.length > 0,
+				message: pulled.length
+					? `Downloaded ${pulled.join(', ')} — failed on ${model}: ${result.message}`
+					: result.message,
+				pulled,
+			};
+		}
+	}
+	if (!pulled.length && s.hasModel) {
+		return { ok: true, message: 'All Copix models ready', pulled: [] };
+	}
+	return {
+		ok: true,
+		message: pulled.length ? `Downloaded ${pulled.join(', ')}` : 'All Copix models ready',
+		pulled,
 	};
 }
 
@@ -629,13 +661,20 @@ function looksLikeSecretPath(filePath: string): boolean {
 		if (!s.online) {
 			return { ok: false, message: 'Ollama not running — install from ollama.com and open the Ollama app' };
 		}
-		if (s.hasModel) return { ok: true, message: `Ollama · ${DEFAULT_OLLAMA_MODEL} ready` };
-		return { ok: false, message: `Pull ${DEFAULT_OLLAMA_MODEL} in Settings → Models first` };
+		return ensureCopixModelsInternal();
 	});
 
-	ipcMain.handle('copix:pullOllamaModel', async (_e, model = DEFAULT_OLLAMA_MODEL) => pullModelInternal(model));
+	ipcMain.handle('copix:pullOllamaModel', async (_e, model = FALLBACK_MODEL_ID) => pullModelInternal(model));
+
+	ipcMain.handle('copix:ensureCopixModels', () => ensureCopixModelsInternal());
 
 	createWindow();
+
+	void ensureCopixModelsInternal().then(result => {
+		if (result.pulled.length) {
+			mainWindow?.webContents.send('copix:modelsReady', result.message);
+		}
+	}).catch(() => undefined);
 });
 
 app.on('activate', () => {

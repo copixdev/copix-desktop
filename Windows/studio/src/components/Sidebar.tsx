@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChatSession } from '../hooks/chatSessions';
 import type { WorkspaceEnvironment } from '../models/agentModes';
 import {
-	IconPlus, IconFolder, IconCommand, IconSparkle, IconChevron,
+	IconPlus, IconFolder, IconCommand, IconSparkle, IconChevron, IconChat,
 } from './Icons';
 
 interface Props {

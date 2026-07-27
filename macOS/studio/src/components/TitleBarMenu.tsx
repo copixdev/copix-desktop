@@ -5,7 +5,6 @@ export interface TitleBarMenuActions {
 	onOpenFolder?: () => void;
 	onCloneRepo?: () => void;
 	onToggleEditor?: () => void;
-	onOpenSettings?: () => void;
 	onOpenPalette?: () => void;
 }
 
@@ -69,7 +68,6 @@ export function TitleBarMenu(props: Props) {
 							{m.id === 'edit' && (
 								<>
 									{item('Command Palette…', props.onOpenPalette)}
-									{item('Settings…', props.onOpenSettings)}
 								</>
 							)}
 							{m.id === 'view' && (
@@ -80,7 +78,6 @@ export function TitleBarMenu(props: Props) {
 							{m.id === 'help' && (
 								<>
 									{item('Copix on GitHub', () => window.copix?.openExternal('https://github.com/EJH-BAE/Copix'))}
-									{item('About Copix', props.onOpenSettings)}
 								</>
 							)}
 						</div>

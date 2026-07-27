@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChatSession } from '../hooks/chatSessions';
 import type { WorkspaceEnvironment } from '../models/agentModes';
 import {
-	IconPlus, IconFolder, IconSettings, IconChat, IconCommand, IconSparkle, IconPanelRight, IconChevron,
+	IconPlus, IconFolder, IconCommand, IconSparkle, IconChevron,
 } from './Icons';
 
 interface Props {
@@ -16,7 +16,6 @@ interface Props {
 	onNewChat: () => void;
 	onOpenFolder: () => void;
 	onCloneRepo: (url: string) => void;
-	onOpenSettings: () => void;
 	onOpenPalette?: () => void;
 	onTogglePinSession: (id: string) => void;
 	onArchiveSession: (id: string) => void;
@@ -51,7 +50,7 @@ function relativeTime(ts: number): string {
 
 export function Sidebar({
 	sessions, activeId, workspace,
-	onSelectSession, onNewChat, onOpenFolder, onCloneRepo, onOpenSettings,
+	onSelectSession, onNewChat, onOpenFolder, onCloneRepo,
 	onOpenPalette, onTogglePinSession, onDeleteSession,
 }: Props) {
 	const [cloneInput, setCloneInput] = useState('');
@@ -126,10 +125,6 @@ export function Sidebar({
 				<button type="button" className="sidebar-action" onClick={onOpenPalette}>
 					<IconCommand width={15} height={15} />
 					<span>Search</span>
-				</button>
-				<button type="button" className="sidebar-action" onClick={onOpenSettings}>
-					<IconPanelRight width={15} height={15} />
-					<span>Customize</span>
 				</button>
 			</div>
 
@@ -306,19 +301,6 @@ export function Sidebar({
 					</div>
 				)}
 			</section>
-
-			<footer className="sidebar-profile">
-				<div className="sidebar-profile-left">
-					<span className="settings-avatar">C</span>
-					<div className="sidebar-profile-text">
-						<div className="settings-user-name fade-edge">Copix</div>
-						<div className="settings-user-plan">Free</div>
-					</div>
-				</div>
-				<button type="button" className="btn-icon" title="Settings" onClick={onOpenSettings}>
-					<IconSettings width={14} height={14} />
-				</button>
-			</footer>
 			{workspace && <p className="sidebar-cwd" title={workspace}>{shortPath(workspace)}</p>}
 		</aside>
 	);

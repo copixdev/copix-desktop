@@ -5,7 +5,6 @@ import { ChatCenter } from './components/ChatCenter';
 import { CommandPalette, type PaletteCommand } from './components/CommandPalette';
 import { EditorArea, type SidePanelMode } from './components/EditorArea';
 import { ResizableLayout } from './components/ResizableLayout';
-import { SettingsPage } from './components/SettingsPage';
 import { Sidebar } from './components/Sidebar';
 import { StatusBar } from './components/StatusBar';
 import { ToastProvider } from './components/Toast';
@@ -42,7 +41,6 @@ function AppInner() {
 	});
 	const [activeSessionId, setActiveSessionId] = useState(() => sessions[0]?.id ?? '');
 	const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [tree, setTree] = useState<string[]>([]);
 	const [serverOnline, setServerOnline] = useState(false);
 	const [editorVisible, setEditorVisible] = useState(true);
@@ -95,9 +93,6 @@ function AppInner() {
 
 	useEffect(() => { copix.setSettings(settings); }, [settings]);
 
-
-
-	// Theme: light/dark with live system sync
 	useEffect(() => {
 		const mq = window.matchMedia('(prefers-color-scheme: light)');
 		const apply = () => {
@@ -298,12 +293,6 @@ function AppInner() {
 	const workspaceEnv = activeSession?.workspaceEnv
 		?? inferWorkspaceEnv(activeSession?.repoUrl, Boolean(workspace));
 
-	const cycleTheme = () => setSettings(prev => {
-		const order: ThemePreference[] = ['system', 'dark', 'light'];
-		const next = order[(order.indexOf(prev.theme) + 1) % order.length];
-		return { ...prev, theme: next };
-	});
-
 	const focusComposer = () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus();
 
 	const paletteCommands: PaletteCommand[] = [
@@ -311,10 +300,6 @@ function AppInner() {
 		{ id: 'focus-agent', label: 'Focus agent input', hint: 'Ctrl+L', run: focusComposer },
 		{ id: 'toggle-editor', label: editorVisible ? 'Hide editor panel' : 'Show editor panel', hint: 'Ctrl+B', run: () => setEditorVisible(v => !v) },
 		{ id: 'open-folder', label: 'Open folder…', hint: 'Attach a local folder to this chat', run: openFolder },
-		{ id: 'theme-system', label: 'Theme: sync with system', run: () => setSettings(prev => ({ ...prev, theme: 'system' })) },
-		{ id: 'theme-dark', label: 'Theme: dark', run: () => setSettings(prev => ({ ...prev, theme: 'dark' })) },
-		{ id: 'theme-light', label: 'Theme: light', run: () => setSettings(prev => ({ ...prev, theme: 'light' })) },
-		{ id: 'settings', label: 'Open settings', hint: 'Models, appearance, workspace', run: () => setSettingsOpen(true) },
 	];
 
 	return (
@@ -329,7 +314,6 @@ function AppInner() {
 						if (url?.trim()) void cloneRepo(url.trim());
 					}}
 					onToggleEditor={() => setEditorVisible(v => !v)}
-					onOpenSettings={() => setSettingsOpen(true)}
 					onOpenPalette={() => setPaletteOpen(true)}
 				/>
 				<span className="titlebar-drag" />
@@ -368,7 +352,6 @@ function AppInner() {
 					onNewChat={handleNewChat}
 					onToggleEditor={() => setEditorVisible(v => !v)}
 					onOpenPalette={() => setPaletteOpen(true)}
-					onOpenSettings={() => setSettingsOpen(true)}
 					onFocusComposer={focusComposer}
 				/>
 
@@ -391,7 +374,6 @@ function AppInner() {
 						onNewChat={handleNewChat}
 						onOpenFolder={openFolder}
 						onCloneRepo={cloneRepo}
-						onOpenSettings={() => setSettingsOpen(true)}
 						onOpenPalette={() => setPaletteOpen(true)}
 						onTogglePinSession={togglePinSession}
 						onArchiveSession={archiveSession}
@@ -409,8 +391,6 @@ function AppInner() {
 						onMessagesChange={(msgs, title) =>
 							patchSession(activeSessionId, { messages: msgs, ...(title ? { title } : {}) })}
 						onWorkspaceChange={refreshWorkspace}
-						onOpenSettings={() => setSettingsOpen(true)}
-						onAgentModeChange={mode => setSettings(prev => ({ ...prev, agentMode: mode }))}
 						onOpenFile={path => {
 							setEditorVisible(true);
 							setPanelMode('files');
@@ -469,22 +449,12 @@ function AppInner() {
 				workspace={workspace}
 				model={settings.model.modelId}
 				online={serverOnline}
-				theme={settings.theme}
-				onCycleTheme={cycleTheme}
-				onOpenSettings={() => setSettingsOpen(true)}
 			/>
 
 			<CommandPalette
 				open={paletteOpen}
 				commands={paletteCommands}
 				onClose={() => setPaletteOpen(false)}
-			/>
-
-			<SettingsPage
-				open={settingsOpen}
-				settings={settings}
-				onClose={() => setSettingsOpen(false)}
-				onChange={setSettings}
 			/>
 		</div>
 	);

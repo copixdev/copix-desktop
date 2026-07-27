@@ -2,10 +2,9 @@ import { formatAgentError } from '../utils/agentErrors';
 
 interface Props {
 	error: string;
-	onOpenSettings?: () => void;
 }
 
-export function AgentErrorCard({ error, onOpenSettings }: Props) {
+export function AgentErrorCard({ error }: Props) {
 	const fmt = formatAgentError(error);
 
 	return (
@@ -18,11 +17,6 @@ export function AgentErrorCard({ error, onOpenSettings }: Props) {
 				<ul className="agent-error-hints">
 					{fmt.hints.map(h => <li key={h}>{h}</li>)}
 				</ul>
-			)}
-			{onOpenSettings && (
-				<button type="button" className="btn primary sm agent-error-action" onClick={onOpenSettings}>
-					Open model settings
-				</button>
 			)}
 			{fmt.detail && (
 				<details className="agent-error-detail">

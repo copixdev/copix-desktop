@@ -34,7 +34,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconSend, IconPlay, IconChevron, IconCopy } from './Icons';
+import { IconSend, IconPlay, IconCopy } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
@@ -66,11 +66,7 @@ interface Props {
 
 	onWorkspaceChange: (root: string) => void;
 
-	onOpenSettings: () => void;
-
 	tree?: string[];
-
-	onAgentModeChange?: (mode: AgentMode) => void;
 
 	onOpenFile?: (path: string) => void;
 
@@ -106,7 +102,6 @@ function AssistantTurn({
 	content,
 	timestamp,
 	live,
-	onOpenSettings,
 	onOpenFile,
 	onReviewFiles,
 }: {
@@ -114,7 +109,6 @@ function AssistantTurn({
 	content?: string;
 	timestamp?: number;
 	live?: boolean;
-	onOpenSettings?: () => void;
 	onOpenFile?: (path: string) => void;
 	onReviewFiles?: (files: FileChange[]) => void;
 }) {
@@ -148,7 +142,7 @@ function AssistantTurn({
 					)}
 					{content && isError && (
 						<div className="msg-body assistant">
-							<AgentErrorCard error={errorRaw} onOpenSettings={onOpenSettings} />
+							<AgentErrorCard error={errorRaw} />
 						</div>
 					)}
 					{showContent && (
@@ -179,8 +173,8 @@ function AssistantTurn({
 
 export function ChatCenter({
 
-	sessionId, workspace, settings, messages, onMessagesChange, onWorkspaceChange, onOpenSettings,
-	tree = [], onAgentModeChange, onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
+	sessionId, workspace, settings, messages, onMessagesChange, onWorkspaceChange,
+	tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
 
 }: Props) {
 
@@ -230,9 +224,8 @@ export function ChatCenter({
 
 	const config = settingsToConfig(settings.model);
 
-	const account = settings.accounts.find(a => a.id === settings.activeAccountId);
-
-	const agentMode = settings.agentMode;
+	const [sessionMode, setSessionMode] = useState<AgentMode | null>(null);
+	const agentMode = sessionMode ?? settings.agentMode;
 
 	const modelReady = server.online;
 
@@ -276,6 +269,10 @@ export function ChatCenter({
 		const t = setInterval(poll, 3000);
 		return () => clearInterval(t);
 	}, []);
+
+	useEffect(() => {
+		setSessionMode(null);
+	}, [sessionId]);
 
 	// Blank slate when switching agents — abort in-flight work and clear local UI state.
 	useEffect(() => {
@@ -595,11 +592,10 @@ export function ChatCenter({
 
 			{!modelReady && (
 				<div className="banner banner-warn">
-					<span>Ollama offline or qwen2.5:3b not pulled — install Ollama and pull the model.</span>
+					<span>Ollama offline or model not pulled — edit ~/Copix/settings.json and run ollama pull qwen2.5:3b</span>
 					<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
 						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : 'Check Ollama'}
 					</button>
-					<button type="button" className="btn ghost sm" onClick={onOpenSettings}>Model settings</button>
 				</div>
 			)}
 
@@ -667,7 +663,6 @@ export function ChatCenter({
 							activities={m.activities}
 							content={m.content}
 							timestamp={m.timestamp}
-							onOpenSettings={onOpenSettings}
 							onOpenFile={onOpenFile}
 							onReviewFiles={onReviewFiles}
 						/>
@@ -679,7 +674,6 @@ export function ChatCenter({
 						activities={activities}
 						content={liveContent}
 						live
-						onOpenSettings={onOpenSettings}
 						onOpenFile={onOpenFile}
 						onReviewFiles={onReviewFiles}
 					/>
@@ -706,14 +700,12 @@ export function ChatCenter({
 
 			<div className="composer">
 				<div className="composer-meta">
-					<button type="button" className="model-chip" title="Change model" onClick={onOpenSettings}>
+					<span className="model-chip" title="Model from ~/Copix/settings.json">
 						<span className={`chip-dot ${modelReady ? 'on' : ''}`} />
 						<span className="chip-model">{config.model}</span>
-						<IconChevron width={11} height={11} className="chip-chevron" />
-					</button>
+					</span>
 					<span className="composer-hint">
-						{account?.displayName}
-						{workspace ? ` · ${shortPath(workspace)}` : ''}
+						{workspace ? shortPath(workspace) : 'No workspace'}
 					</span>
 					<span className="composer-keys">Enter to send · Shift+Enter for newline</span>
 				</div>
@@ -749,7 +741,7 @@ export function ChatCenter({
 									}
 								});
 							}}
-							onModeChange={onAgentModeChange}
+							onModeChange={setSessionMode}
 							onClose={() => setCmdDismissed(true)}
 						/>
 					)}
@@ -809,7 +801,7 @@ export function ChatCenter({
 												}
 											});
 										},
-										onModeChange: onAgentModeChange,
+										onModeChange: setSessionMode,
 										onClose: () => setCmdDismissed(true),
 									});
 								},

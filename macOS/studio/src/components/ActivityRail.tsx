@@ -1,4 +1,4 @@
-import { IconChat, IconCode, IconCommand, IconLogo, IconPlus, IconSettings } from './Icons';
+import { IconChat, IconCode, IconCommand, IconLogo, IconPlus } from './Icons';
 
 interface Props {
 	editorVisible: boolean;
@@ -6,12 +6,11 @@ interface Props {
 	onNewChat: () => void;
 	onToggleEditor: () => void;
 	onOpenPalette: () => void;
-	onOpenSettings: () => void;
 	onFocusComposer: () => void;
 }
 
 export function ActivityRail({
-	editorVisible, serverOnline, onNewChat, onToggleEditor, onOpenPalette, onOpenSettings, onFocusComposer,
+	editorVisible, serverOnline, onNewChat, onToggleEditor, onOpenPalette, onFocusComposer,
 }: Props) {
 	return (
 		<nav className="activity-rail">
@@ -36,12 +35,6 @@ export function ActivityRail({
 			</button>
 			<button type="button" className="rail-btn" title="Command palette (Ctrl+K)" onClick={onOpenPalette}>
 				<IconCommand width={18} height={18} />
-			</button>
-
-			<div className="rail-spacer" />
-
-			<button type="button" className="rail-btn" title="Settings" onClick={onOpenSettings}>
-				<IconSettings width={18} height={18} />
 			</button>
 		</nav>
 	);

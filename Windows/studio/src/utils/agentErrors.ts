@@ -38,7 +38,7 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			hints: [
 				'Quit Ollama from the tray (and Task Manager if needed), then reopen it.',
 				'Update Ollama to the latest version, then update NVIDIA drivers.',
-				'In Copix Settings → Models, enable Low VRAM mode (CPU-safe).',
+				'In Copix, enable Low VRAM mode in ~/Copix/settings.json (model.lowVram).',
 				'If you installed CUDA Toolkit separately, remove its bin folder from PATH so Ollama uses its bundled runtime.',
 			],
 		};
@@ -51,7 +51,7 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			detail: ollamaMsg,
 			hints: [
 				'Restart Ollama completely (tray quit → reopen).',
-				'Enable Low VRAM mode in Settings → Models (runs on CPU; slower but stable).',
+				'Set model.lowVram to true in ~/Copix/settings.json (runs on CPU; slower but stable).',
 				'Close games and other GPU apps before retrying.',
 			],
 		};
@@ -63,7 +63,7 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			summary: 'The model ran out of GPU or system memory.',
 			detail: ollamaMsg,
 			hints: [
-				'Enable Low VRAM mode in Settings → Models.',
+				'Enable Low VRAM mode in ~/Copix/settings.json.',
 				'Close memory-heavy apps and retry.',
 			],
 		};
@@ -76,7 +76,7 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			detail: ollamaMsg,
 			hints: [
 				'Restart Ollama and retry.',
-				'If this keeps happening, enable Low VRAM mode in Settings.',
+				'If this keeps happening, set model.lowVram to true in ~/Copix/settings.json.',
 			],
 		};
 	}

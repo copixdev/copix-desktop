@@ -72,9 +72,7 @@ ollama pull qwen2.5:3b
 Install [Ollama](https://ollama.com), and leave it running (`ollama serve` or a minimized window), then open Copix.
 
 ### 2. First session in Copix
-- Open **Settings** and set models, theme, and home directory (no login)
-- Preferences are written to `%USERPROFILE%\Copix\settings.json`
-- See **Settings file** and **Recommended settings** below
+- Open Copix — there is no settings menu; edit `%USERPROFILE%\Copix\settings.json` to configure model, theme, and workspace
 - Test if Ollama sync works properly using one of the example prompts.
 
 ## Settings file
@@ -98,16 +96,16 @@ The folder and file are created the first time you change Settings. Changing mod
 }
 ```
 
-| Key | Settings UI | Meaning |
-| :-- | :-- | :-- |
-| `model.modelId` | Models → Ollama model | Ollama model tag (default `qwen2.5:3b`) |
-| `model.lowVram` | Models → Low VRAM mode | Smaller context for low-VRAM GPUs |
-| `workspace.homeDirectory` | Workspace → Home directory | Where `create_project` puts new repos |
-| `theme` | Appearance | `system` \| `dark` \| `light` |
-| `agentMode` | Agents | Default mode for new chats |
-| `layout` | Workspace (widths) | Sidebar / editor panel sizes |
+| Key | Meaning |
+| :-- | :-- |
+| `model.modelId` | Ollama model tag (default `qwen2.5:3b`) |
+| `model.lowVram` | Smaller context for low-VRAM GPUs |
+| `workspace.homeDirectory` | Where `create_project` puts new repos |
+| `theme` | `system` \| `dark` \| `light` |
+| `agentMode` | Default mode for new chats |
+| `layout` | Sidebar / editor panel sizes |
 
-Use the in-app Settings screen; hand-editing JSON is optional.
+Use the in-app chat; edit **~/Copix/settings.json** to change model, theme, workspace, or agent mode, then restart Copix.
 
 ## Build
 

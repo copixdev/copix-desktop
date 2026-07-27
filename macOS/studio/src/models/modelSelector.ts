@@ -4,6 +4,7 @@ import {
 	FALLBACK_MODEL_ID,
 	GROQ_FALLBACK_MODEL,
 	GROQ_MODE_MODEL_PREFERENCE,
+	GROQ_MODEL_FALLBACKS,
 	GROQ_TASK_MODEL_PREFERENCE,
 	MODE_MODEL_PREFERENCE,
 	normalizeProvider,
@@ -59,7 +60,7 @@ export function normalizeModelSettings(model: ModelSettings): ModelSettings & { 
 
 function pickGroqModel(candidates: string[]): string {
 	const seen = new Set<string>();
-	for (const id of candidates) {
+	for (const id of [...candidates, ...GROQ_MODEL_FALLBACKS, GROQ_FALLBACK_MODEL]) {
 		if (seen.has(id)) continue;
 		seen.add(id);
 		return id;

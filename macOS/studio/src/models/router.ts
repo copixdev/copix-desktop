@@ -4,6 +4,7 @@ import { copix } from '../api.js';
 import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import type { TaskKind } from './modelCatalog.js';
+import { GROQ_FALLBACK_MODEL, GROQ_MODEL_FALLBACKS } from './modelCatalog.js';
 import { inferTaskKind, isContinuationMessage, isReadOnlyTask } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
@@ -570,95 +571,114 @@ async function streamCompletion(
 	};
 
 	const providerLabel = config.provider === 'groq' ? 'Groq' : 'Ollama';
-	const requestBody = config.provider === 'groq'
-		? {
-			model: config.model,
-			messages,
-			...(opts.tools ? { tools: opts.tools } : {}),
-			stream: true,
-			temperature: 0.05,
-			max_tokens: config.numPredict ?? 16384,
-		}
-		: {
-			model: config.model,
-			messages,
-			...(opts.tools ? { tools: opts.tools } : {}),
-			stream: true,
-			temperature: 0.05,
-			options: {
-				...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 16384 }),
-				num_predict: config.numPredict ?? 16384,
-				num_batch: 512,
-				keep_alive: '30m',
-			},
-		};
+	const modelCandidates = config.provider === 'groq'
+		? [...new Set([config.model, ...GROQ_MODEL_FALLBACKS, GROQ_FALLBACK_MODEL])]
+		: [config.model];
 
-	let res: Response;
-	try {
-		res = await fetch(url, {
-		method: 'POST',
-		headers: buildModelHeaders(config),
-		body: JSON.stringify(requestBody),
-		signal,
-	});
-	} catch (err) {
-		if (signal.aborted) return { assistantText: '', toolCalls: new Map() };
-		const msg = err instanceof Error ? err.message : String(err);
-		throw new Error(`Cannot reach ${providerLabel} at ${config.baseUrl} — ${msg}`);
-	}
+	let lastError = '';
+	for (const modelId of modelCandidates) {
+		const requestBody = config.provider === 'groq'
+			? {
+				model: modelId,
+				messages,
+				...(opts.tools ? { tools: opts.tools } : {}),
+				stream: true,
+				temperature: 0.05,
+				max_tokens: config.numPredict ?? 16384,
+			}
+			: {
+				model: modelId,
+				messages,
+				...(opts.tools ? { tools: opts.tools } : {}),
+				stream: true,
+				temperature: 0.05,
+				options: {
+					...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 16384 }),
+					num_predict: config.numPredict ?? 16384,
+					num_batch: 512,
+					keep_alive: '30m',
+				},
+			};
 
-	if (!res.ok) {
-		const errText = await res.text().catch(() => '');
-		let message = errText.slice(0, 800) || res.statusText;
+		let res: Response;
 		try {
-			const parsed = JSON.parse(errText) as { error?: { message?: string } };
-			if (parsed.error?.message) message = parsed.error.message;
-		} catch { /* raw text */ }
-		throw new Error(`${providerLabel} ${res.status}: ${message}`);
-	}
-
-	const reader = res.body!.getReader();
-	const decoder = new TextDecoder();
-	let buffer = '';
-	let assistantText = '';
-	const toolCalls = new Map<number, { id: string; name: string; args: string }>();
-
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		buffer += decoder.decode(value, { stream: true });
-		const lines = buffer.split('\n');
-		buffer = lines.pop() ?? '';
-		for (const line of lines) {
-			if (!line.startsWith('data: ')) continue;
-			const payload = line.slice(6).trim();
-			if (payload === '[DONE]') continue;
-			try {
-				const json = JSON.parse(payload);
-				const delta = json.choices?.[0]?.delta;
-				const reasoning = delta?.reasoning_content ?? delta?.reasoning;
-				if (reasoning) {
-					callbacks.onThinkingChunk(String(reasoning));
-				}
-				if (delta?.content) {
-					endThinking();
-					assistantText += delta.content;
-					if (opts.emitText !== false) callbacks.onText(delta.content);
-				}
-				for (const tc of delta?.tool_calls ?? []) {
-					if (tc.function?.name) endThinking();
-					const idx = tc.index ?? 0;
-					if (!toolCalls.has(idx)) toolCalls.set(idx, { id: tc.id ?? `c${idx}`, name: '', args: '' });
-					const e = toolCalls.get(idx)!;
-					if (tc.function?.name) e.name = tc.function.name;
-					if (tc.function?.arguments) e.args += tc.function.arguments;
-				}
-			} catch { /* skip */ }
+			res = await fetch(url, {
+				method: 'POST',
+				headers: buildModelHeaders(config),
+				body: JSON.stringify(requestBody),
+				signal,
+			});
+		} catch (err) {
+			if (signal.aborted) return { assistantText: '', toolCalls: new Map() };
+			const msg = err instanceof Error ? err.message : String(err);
+			throw new Error(`Cannot reach ${providerLabel} at ${config.baseUrl} — ${msg}`);
 		}
+
+		if (!res.ok) {
+			const errText = await res.text().catch(() => '');
+			let message = errText.slice(0, 800) || res.statusText;
+			try {
+				const parsed = JSON.parse(errText) as { error?: { message?: string } };
+				if (parsed.error?.message) message = parsed.error.message;
+			} catch { /* raw text */ }
+			lastError = `${providerLabel} ${res.status}: ${message}`;
+			const modelMissing = res.status === 404
+				|| /does not exist|not found|do not have access|model_not_found/i.test(message);
+			if (config.provider === 'groq' && modelMissing && modelId !== modelCandidates[modelCandidates.length - 1]) {
+				continue;
+			}
+			throw new Error(lastError);
+		}
+
+		if (modelId !== config.model) {
+			config.model = modelId;
+		}
+
+		const reader = res.body!.getReader();
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let assistantText = '';
+		const toolCalls = new Map<number, { id: string; name: string; args: string }>();
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split('\n');
+			buffer = lines.pop() ?? '';
+			for (const line of lines) {
+				if (!line.startsWith('data: ')) continue;
+				const payload = line.slice(6).trim();
+				if (payload === '[DONE]') continue;
+				try {
+					const json = JSON.parse(payload);
+					const delta = json.choices?.[0]?.delta;
+					const reasoning = delta?.reasoning_content ?? delta?.reasoning;
+					if (reasoning) {
+						callbacks.onThinkingChunk(String(reasoning));
+					}
+					if (delta?.content) {
+						endThinking();
+						assistantText += delta.content;
+						if (opts.emitText !== false) callbacks.onText(delta.content);
+					}
+					for (const tc of delta?.tool_calls ?? []) {
+						if (tc.function?.name) endThinking();
+						const idx = tc.index ?? 0;
+						if (!toolCalls.has(idx)) toolCalls.set(idx, { id: tc.id ?? `c${idx}`, name: '', args: '' });
+						const e = toolCalls.get(idx)!;
+						if (tc.function?.name) e.name = tc.function.name;
+						if (tc.function?.arguments) e.args += tc.function.arguments;
+					}
+				} catch { /* skip */ }
+			}
+		}
+
+		endThinking();
+		return { assistantText, toolCalls };
 	}
 
-	endThinking();
-	return { assistantText, toolCalls };
+	throw new Error(lastError || `${providerLabel}: no available model`);
 }
 
 function historyToMessages(messages: Array<{ role: string; content: string }>, maxTurns = MAX_HISTORY_TURNS): ChatMsg[] {

@@ -39,8 +39,9 @@ export const TASK_MODEL_PREFERENCE: Record<TaskKind, string> = {
 /** Groq free tier — no download, instant (https://console.groq.com). */
 export const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 
+/** Current Groq production / preview chat models (IDs change — keep in sync with console.groq.com/docs/models). */
 export const GROQ_MODE_MODEL_PREFERENCE: Record<AgentMode, string> = {
-	code: 'qwen/qwen3-32b',
+	code: 'openai/gpt-oss-120b',
 	debug: 'llama-3.3-70b-versatile',
 	terminal: 'llama-3.1-8b-instant',
 	plan: 'llama-3.3-70b-versatile',
@@ -50,12 +51,21 @@ export const GROQ_TASK_MODEL_PREFERENCE: Record<TaskKind, string> = {
 	inspect: 'llama-3.3-70b-versatile',
 	plan: 'llama-3.3-70b-versatile',
 	debug: 'llama-3.3-70b-versatile',
-	implement: 'qwen/qwen3-32b',
+	implement: 'openai/gpt-oss-120b',
 	terminal: 'llama-3.1-8b-instant',
 	general: 'llama-3.3-70b-versatile',
 };
 
 export const GROQ_FALLBACK_MODEL = 'llama-3.1-8b-instant';
+
+/** Ordered fallbacks when preferred Groq model returns 404 / no access. */
+export const GROQ_MODEL_FALLBACKS = [
+	'openai/gpt-oss-120b',
+	'openai/gpt-oss-20b',
+	'qwen/qwen3.6-27b',
+	'llama-3.3-70b-versatile',
+	'llama-3.1-8b-instant',
+] as const;
 
 export function normalizeProvider(provider?: string): ModelProvider {
 	return provider === 'groq' ? 'groq' : 'ollama';

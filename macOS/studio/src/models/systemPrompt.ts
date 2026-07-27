@@ -85,7 +85,6 @@ function toolGuidance(): string {
 export interface SystemPromptOptions {
 	mode: AgentMode;
 	workspaceRoot: string;
-	customRules?: string[];
 }
 
 export function buildSystemPrompt(opts: SystemPromptOptions): string {
@@ -93,7 +92,6 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
 	const rules = [
 		...DEFAULT_RULES,
 		...MODE_RULES[opts.mode],
-		...(opts.customRules ?? []),
 	];
 
 	return `# Copix — Software Engineering Agent

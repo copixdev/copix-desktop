@@ -14,11 +14,6 @@ studio/release/*.dmg
 studio/release/*.zip
 studio/release/*.blockmap
 studio/.env
-studio/copix-core/.venv/
-studio/copix-core/output/
-studio/copix-core/tools/
-studio/copix-cloud/.venv/
-studio/copix-cloud/.env
 
 # Local IDE
 .cursor/

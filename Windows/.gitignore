@@ -13,11 +13,6 @@ studio/release/staging/
 studio/release/*.exe
 studio/release/*.blockmap
 studio/.env
-studio/copix-core/.venv/
-studio/copix-core/output/
-studio/copix-core/tools/
-studio/copix-cloud/.venv/
-studio/copix-cloud/.env
 
 # Large binaries — ship via GitHub Releases, not git
 /Copix.exe

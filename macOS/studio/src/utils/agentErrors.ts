@@ -3,7 +3,6 @@ export interface FormattedAgentError {
 	summary: string;
 	detail?: string;
 	hints: string[];
-	canUseCloud: boolean;
 }
 
 function tryParseOllamaJson(raw: string): string | null {
@@ -39,26 +38,22 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			hints: [
 				'Quit Ollama from the tray (and Task Manager if needed), then reopen it.',
 				'Update Ollama to the latest version, then update NVIDIA drivers.',
-				'In Copix Settings → Models, enable Low VRAM mode (CPU-safe) or switch to Cloud.',
-				'gpt-oss:20b often fails on 8GB laptop VRAM — Cloud (OpenRouter / Groq) avoids this entirely.',
+				'In Copix Settings → Models, enable Low VRAM mode (CPU-safe).',
 				'If you installed CUDA Toolkit separately, remove its bin folder from PATH so Ollama uses its bundled runtime.',
 			],
-			canUseCloud: true,
 		};
 	}
 
 	if (isStackCrash) {
 		return {
 			title: 'Ollama process crashed',
-			summary: 'The local model server crashed while loading or running the model. This is common with gpt-oss:20b on limited VRAM.',
+			summary: 'The local model server crashed while loading or running the model.',
 			detail: ollamaMsg,
 			hints: [
 				'Restart Ollama completely (tray quit → reopen).',
 				'Enable Low VRAM mode in Settings → Models (runs on CPU; slower but stable).',
-				'Or switch to Cloud with a free OpenRouter / Groq key.',
-				'Close games and other GPU apps before retrying local gpt-oss.',
+				'Close games and other GPU apps before retrying.',
 			],
-			canUseCloud: true,
 		};
 	}
 
@@ -68,10 +63,9 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			summary: 'The model ran out of GPU or system memory.',
 			detail: ollamaMsg,
 			hints: [
-				'Enable Low VRAM mode or use cloud inference in Settings.',
+				'Enable Low VRAM mode in Settings → Models.',
 				'Close memory-heavy apps and retry.',
 			],
-			canUseCloud: true,
 		};
 	}
 
@@ -82,9 +76,8 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			detail: ollamaMsg,
 			hints: [
 				'Restart Ollama and retry.',
-				'If this keeps happening with gpt-oss:20b, use Low VRAM or Cloud in Settings.',
+				'If this keeps happening, enable Low VRAM mode in Settings.',
 			],
-			canUseCloud: true,
 		};
 	}
 
@@ -95,20 +88,8 @@ export function formatAgentError(raw: string): FormattedAgentError {
 			detail: ollamaMsg,
 			hints: [
 				'Install and open Ollama from ollama.com.',
-				'Run: ollama pull gpt-oss:20b',
-				'Or use Cloud in Settings with OpenRouter / Groq.',
+				'Run: ollama pull qwen2.5:3b',
 			],
-			canUseCloud: true,
-		};
-	}
-
-	if (low.includes('401') || low.includes('403') || low.includes('api key')) {
-		return {
-			title: 'API key rejected',
-			summary: 'Your cloud API key was rejected.',
-			detail: ollamaMsg,
-			hints: ['Open Settings → Models → paste a valid OpenRouter or Groq key.'],
-			canUseCloud: false,
 		};
 	}
 
@@ -117,6 +98,5 @@ export function formatAgentError(raw: string): FormattedAgentError {
 		summary: ollamaMsg.length > 280 ? ollamaMsg.slice(0, 280) + '…' : ollamaMsg,
 		detail: ollamaMsg.length > 280 ? ollamaMsg : undefined,
 		hints: [],
-		canUseCloud: raw.toLowerCase().includes('ollama') || low.includes('llama-server'),
 	};
 }

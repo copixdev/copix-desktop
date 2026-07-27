@@ -19,9 +19,9 @@ export function AgentErrorCard({ error, onOpenSettings }: Props) {
 					{fmt.hints.map(h => <li key={h}>{h}</li>)}
 				</ul>
 			)}
-			{fmt.canUseCloud && onOpenSettings && (
+			{onOpenSettings && (
 				<button type="button" className="btn primary sm agent-error-action" onClick={onOpenSettings}>
-					Switch to cloud model
+					Open model settings
 				</button>
 			)}
 			{fmt.detail && (

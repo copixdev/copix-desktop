@@ -1,5 +1,6 @@
 import type { AgentMode } from './agentModes.js';
 import { getAgentMode } from './agentModes.js';
+import { projectPathExample } from '../utils/platform.js';
 
 export const DEFAULT_RULES = [
 	'Read files before editing. Use tools proactively.',
@@ -7,7 +8,7 @@ export const DEFAULT_RULES = [
 	'Explain trade-offs briefly when multiple approaches exist.',
 	'Never invent file paths — verify with `list_dir` or `grep` first.',
 	'Never use API keys, tokens, or secrets as filenames or paths.',
-	'New projects go in the user home folder (e.g. `C:/Users/you/my-app`).',
+	`New projects go in the user home folder (e.g. \`${projectPathExample()}\`).`,
 	'Use `edit_file` for small patches; `write_file` only for new files or full rewrites.',
 ];
 
@@ -27,7 +28,7 @@ const MODE_RULES: Record<AgentMode, string[]> = {
 	],
 	terminal: [
 		'Prefer shell commands for environment setup, builds, and automation.',
-		'Use `elevate=true` on `run_terminal` when Administrator access is required.',
+		'Use `elevate=true` on `run_terminal` when administrator / sudo access is required.',
 	],
 };
 
@@ -57,18 +58,19 @@ You may also return a JSON object when batching actions:
 - Put executable work in \`actions\`.
 - After actions run, the \`message\` is shown in chat.`;
 
-const TOOL_GUIDANCE = `## Tools
+function toolGuidance(): string {
+	return `## Tools
 
 | Tool | When to use |
 |------|-------------|
-| \`create_project\` | New repo under user home (\`C:/Users/you/<name>\`) |
+| \`create_project\` | New repo under user home (\`${projectPathExample('<name>')}\`) |
 | \`read_file\` | Inspect source before editing |
 | \`edit_file\` | Surgical search-and-replace in existing files |
 | \`write_file\` | New files or full rewrites |
 | \`delete_file\` | Remove a file |
 | \`grep\` | Search codebase (ripgrep) |
 | \`list_dir\` | Explore folder structure |
-| \`run_terminal\` | Build, test, install packages (\`elevate=true\` for admin) |
+| \`run_terminal\` | Build, test, install packages (\`elevate=true\` for admin/sudo) |
 | \`multitask\` | Parallel independent reads/searches |
 | \`spawn_subagent\` | Delegate a large isolated task to a child agent |
 
@@ -78,11 +80,11 @@ const TOOL_GUIDANCE = `## Tools
 - Absolute paths are allowed.
 - Use kebab-case names: \`src/components/ContactForm.tsx\`.
 - Never use \`copix-output\` as a folder name.`;
+}
 
 export interface SystemPromptOptions {
 	mode: AgentMode;
 	workspaceRoot: string;
-	customRules?: string[];
 }
 
 export function buildSystemPrompt(opts: SystemPromptOptions): string {
@@ -90,7 +92,6 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
 	const rules = [
 		...DEFAULT_RULES,
 		...MODE_RULES[opts.mode],
-		...(opts.customRules ?? []),
 	];
 
 	return `# Copix — Software Engineering Agent
@@ -109,7 +110,7 @@ ${rules.map(r => `- ${r}`).join('\n')}
 - Relative paths are relative to this root.
 - Absolute paths work anywhere on the machine.
 
-${TOOL_GUIDANCE}
+${toolGuidance()}
 
 ${RESPONSE_GUIDANCE}`;
 }

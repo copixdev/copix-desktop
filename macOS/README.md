@@ -10,7 +10,8 @@
 
 <p align="center">
 
-<img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+<img src="https://img.shields.io/badge/License-Proprietary-lightgrey.svg" alt="License: Proprietary">
+<img src="https://img.shields.io/badge/Price-Free-brightgreen.svg" alt="Free">
 <img src="https://github.com/EJH-BAE/Copix/actions/workflows/dependabot/dependabot-updates/badge.svg" alt="dependabot-updates">
 </p>
 
@@ -39,7 +40,7 @@ Copix helps you with some things..
 | Code editing | Edits your own code |
 | Error handling | Runs its own terminal and handles errors |
 | Explanation | Explains repos and directories |
-| Model setting | Tunes gpt-oss (if needed) / syncs local models |
+| Model setting | Ollama local models (default `qwen2.5:3b`) |
 
 
 ## How it works
@@ -66,21 +67,53 @@ flowchart LR
 
 ### 1. Pull the default model
 ```bash
-ollama pull gpt-oss:20b   #default 20b model
-ollama pull gpt-oss:120b  #120b model - only for more quality (not recommended)
+ollama pull qwen2.5:3b
 ```
 Install [Ollama](https://ollama.com), and leave it running (`ollama serve` or a minimized window), then open Copix.
 
 ### 2. First session in Copix
-- Log in / Sign up (create accounts in Supabase)
-- Set up preferences in the settings menu (recommended settings are in **Recommended Preferences**)
+- Open **Settings** and set models, theme, and home directory (no login)
+- Preferences are written to `/Users/baejuhan/Copix/settings.json`
+- See **Settings file** and **Recommended settings** below
 - Test if Ollama sync works properly using one of the example prompts.
+
+## Settings file
+
+Copix stores all preferences locally (no accounts):
+
+**Path:** `/Users/baejuhan/Copix/settings.json` (same as `~/Copix/settings.json`)
+
+The folder and file are created the first time you change Settings. Changing models, theme, workspace home, or agent mode updates this file; quitting and reopening Copix reloads it.
+
+```json
+{
+  "model": {
+    "modelId": "qwen2.5:3b",
+    "lowVram": false
+  },
+  "layout": { "sidebarWidth": 220, "editorWidth": 420 },
+  "workspace": { "homeDirectory": "/Users/baejuhan" },
+  "theme": "system",
+  "agentMode": "code"
+}
+```
+
+| Key | Settings UI | Meaning |
+| :-- | :-- | :-- |
+| `model.modelId` | Models → Ollama model | Ollama model tag (default `qwen2.5:3b`) |
+| `model.lowVram` | Models → Low VRAM mode | Smaller context for low-memory Macs |
+| `workspace.homeDirectory` | Workspace → Home directory | Where `create_project` puts new repos |
+| `theme` | Appearance | `system` \| `dark` \| `light` |
+| `agentMode` | Agents | Default mode for new chats |
+| `layout` | Workspace (widths) | Sidebar / editor panel sizes |
+
+Use the in-app Settings screen; hand-editing JSON is optional.
 
 ## Build
 
 **Requirements:** macOS + Node.js (`npm`)
 
-Copix is a **macOS-only** app.
+Copix macOS build (for `/Users/baejuhan`):
 
 ```bash
 cd studio
@@ -96,7 +129,7 @@ cd studio && npm install && npm run dist
 Output: `studio/release/Copix-<version>-mac-arm64.dmg` (Apple Silicon) and/or `…-mac-x64.dmg` (Intel)  
 Running: open `Copix.app`, or drag it to Applications
 
-Recommended home directory in Settings: `/Users/{username}/`
+Recommended `workspace.homeDirectory`: `/Users/baejuhan`
 
 ## Download
 
@@ -107,33 +140,32 @@ Open the `.dmg` and drag Copix to Applications.
 
 Open Copix from Applications (or the unpacked `.app`).
 
-## Recommended Preferences
+## Recommended settings
+
+Values below map to keys in `settings.json`.
 
 ### Models
----
 
-| Preferences | Recommended | 
-| :--: | :-- |
-| Model | `gpt-oss:20b` (Ollama or Cloud) |
-| Copix Core Preference | `Unabled` |
-| Low VRAM Mode | `Unabled` (for low-performance computers, use `Enabled`) |
-| Copix Core Train / Setup | `Unabled` |
+| Setting | `settings.json` | Recommended |
+| :-- | :-- | :-- |
+| Model | `model.modelId` | `qwen2.5:3b` (Ollama) |
+| Low VRAM Mode | `model.lowVram` | `false` (use `true` on low-memory machines) |
 
 ### Workspace & Agents
----
 
-| Preferences | Recommended | 
-| :--: | :-- |
-| Home Directory | `/Users/{username}` |
-| Default Agent Mode | `Code` |
+| Setting | `settings.json` | Recommended |
+| :-- | :-- | :-- |
+| Home Directory | `workspace.homeDirectory` | `/Users/baejuhan` |
+| Default Agent Mode | `agentMode` | `code` |
 
 
 
 ## License & Copyright
 
-Copix is a fork of [Code-OSS](https://github.com/microsoft/vscode). <br/>
-Copyright for [Code-OSS](https://github.com/microsoft/vscode) remains in [Microsoft](https://github.com/Microsoft). <br/>
-AI functions, components, UI, tool system, etc. are all copyright Bae Juhan.
+Copix is **free to use** and **not open source**. GitHub is used for development and deployment only — see [LICENSE.txt](LICENSE.txt).
+
+Portions may include third-party components (for example Code-OSS) under their own licenses.
+
 
 ## Links
 - [Ollama](https://ollama.com)

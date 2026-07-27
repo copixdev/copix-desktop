@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron';
-import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as os from 'node:os';
@@ -47,218 +47,40 @@ function loadAppIcon(): Electron.NativeImage | undefined {
 }
 
 let mainWindow: BrowserWindow | undefined;
-let serverProc: ChildProcess | undefined;
-let trainProc: ChildProcess | undefined;
-let trainWatchTimer: ReturnType<typeof setInterval> | undefined;
-let trainStderr = '';
-let setupRunning = false;
-let setupAbort = false;
-
-type SetupPhase =
-	| 'idle'
-	| 'checking_ollama'
-	| 'pulling'
-	| 'installing_deps'
-	| 'building_dataset'
-	| 'training'
-	| 'exporting'
-	| 'done'
-	| 'error';
-
-type SetupFailedStep = Exclude<SetupPhase, 'idle' | 'done' | 'error'>;
-
-interface SetupProgress {
-	phase: SetupPhase;
-	message: string;
-	training?: Record<string, unknown>;
-	failedStep?: SetupFailedStep;
-	errorType?: string;
-	detail?: string;
-}
-
-interface SetupResult {
-	ok: boolean;
-	message: string;
-	failedStep?: SetupFailedStep;
-	errorType?: string;
-	detail?: string;
-}
-
-interface TrainingStatusFile {
-	status?: string;
-	message?: string;
-	error_type?: string;
-	failed_step?: string;
-	detail?: string;
-}
-
-let currentSetup: SetupProgress = { phase: 'idle', message: '' };
-let activeSetupStep: SetupFailedStep = 'checking_ollama';
-
-const coreRoot = () => path.join(app.isPackaged ? path.join(process.resourcesPath, 'copix-core') : path.join(__dirname, '..', 'copix-core'));
-const trainingStatusPath = () => path.join(coreRoot(), 'output', 'training_status.json');
-
-function resolvePython(): { exe: string; prefixArgs: string[] } {
-	const winVenv = path.join(coreRoot(), '.venv', 'Scripts', 'python.exe');
-	const posixVenv = path.join(coreRoot(), '.venv', 'bin', 'python');
-	if (fsSync.existsSync(winVenv)) return { exe: winVenv, prefixArgs: [] };
-	if (fsSync.existsSync(posixVenv)) return { exe: posixVenv, prefixArgs: [] };
-	if (process.platform === 'win32') {
-		for (const ver of ['-3.11', '-3.12', '-3.10']) {
-			const r = spawnSync('py', [ver, '-c', 'import sys; raise SystemExit(0 if sys.version_info[:2]>=(3,10) else 1)']);
-			if (r.status === 0) return { exe: 'py', prefixArgs: [ver] };
-		}
-	}
-	return { exe: process.platform === 'win32' ? 'python' : 'python3', prefixArgs: [] };
-}
-
-function spawnPython(args: string[], options: SpawnOptions): ChildProcess {
-	const py = resolvePython();
-	return spawn(py.exe, [...py.prefixArgs, ...args], {
-		...options,
-		env: { ...process.env, PYTHONUNBUFFERED: '1' },
-	});
-}
 
 const OLLAMA_HOST = 'http://127.0.0.1:11434';
+const DEFAULT_OLLAMA_MODEL = 'qwen2.5:3b';
 
 async function fetchOllamaStatus(): Promise<{
 	online: boolean;
-	hasBase: boolean;
-	hasTuned: boolean;
+	hasModel: boolean;
 	models: string[];
 }> {
 	try {
 		const res = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: AbortSignal.timeout(3000) });
-		if (!res.ok) return { online: false, hasBase: false, hasTuned: false, models: [] };
+		if (!res.ok) return { online: false, hasModel: false, models: [] };
 		const data = await res.json() as { models?: Array<{ name: string }> };
 		const names = (data.models ?? []).map(m => m.name);
-		return {
-			online: true,
-			hasBase: names.some(n =>
-				(n.includes('gpt-oss') && !n.includes('copix'))
-				|| n.includes('qwen2.5-coder')
-				|| n.includes('qwen2.5-coder-1.5b'),
-			),
-			hasTuned: names.some(n =>
-				n.includes('copix-core')
-				|| n.includes('copix-gpt-oss'),
-			),
-			models: names,
-		};
+		const hasModel = names.some(n =>
+			n.startsWith(DEFAULT_OLLAMA_MODEL) || n.startsWith(DEFAULT_OLLAMA_MODEL.split(':')[0]),
+		);
+		return { online: true, hasModel, models: names };
 	} catch {
-		return { online: false, hasBase: false, hasTuned: false, models: [] };
+		return { online: false, hasModel: false, models: [] };
 	}
 }
 
 async function fetchServerHealth(): Promise<{
 	online: boolean;
-	adapter?: boolean;
-	hasBase?: boolean;
-	hasTuned?: boolean;
+	hasModel?: boolean;
 	models?: string[];
 }> {
 	const s = await fetchOllamaStatus();
 	return {
-		online: s.online && (s.hasBase || s.hasTuned),
-		adapter: s.hasTuned,
-		hasBase: s.hasBase,
-		hasTuned: s.hasTuned,
+		online: s.online && s.hasModel,
+		hasModel: s.hasModel,
 		models: s.models,
 	};
-}
-
-function broadcastTrainingStatus(): void {
-	if (!mainWindow) return;
-	try {
-		const raw = fsSync.readFileSync(trainingStatusPath(), 'utf8');
-		const data = JSON.parse(raw);
-		mainWindow.webContents.send('copix:trainingProgress', data);
-		if (setupRunning) {
-			currentSetup = { ...currentSetup, training: data };
-			broadcastSetupProgress();
-		}
-	} catch { /* no file yet */ }
-}
-
-function broadcastSetupProgress(): void {
-	mainWindow?.webContents.send('copix:setupProgress', currentSetup);
-}
-
-function setSetup(phase: SetupPhase, message: string): void {
-	if (phase !== 'idle' && phase !== 'done' && phase !== 'error') {
-		activeSetupStep = phase;
-	}
-	currentSetup = { phase, message, training: currentSetup.training };
-	broadcastSetupProgress();
-}
-
-function setSetupError(
-	failedStep: SetupFailedStep,
-	errorType: string,
-	message: string,
-	detail?: string,
-): void {
-	currentSetup = {
-		phase: 'error',
-		message,
-		failedStep,
-		errorType,
-		detail,
-		training: currentSetup.training,
-	};
-	broadcastSetupProgress();
-}
-
-function failStep(
-	failedStep: SetupFailedStep,
-	message: string,
-	opts?: { errorType?: string; detail?: string },
-): SetupResult {
-	const errorType = opts?.errorType ?? 'ProcessError';
-	const detail = opts?.detail;
-	setSetupError(failedStep, errorType, message, detail);
-	return { ok: false, message, failedStep, errorType, detail };
-}
-
-function tailOutput(text: string, max = 1500): string {
-	const t = text.trim();
-	return t.length <= max ? t : t.slice(-max);
-}
-
-function inferErrorType(message: string): string {
-	const low = message.toLowerCase();
-	if (low.includes('execution policy') || low.includes('cannot be loaded')) return 'PowerShellError';
-	if (low.includes('python') && (low.includes('not found') || low.includes('need python'))) return 'PythonNotFoundError';
-	if (low.includes('ollama') && (low.includes('not found') || low.includes('failed'))) return 'OllamaError';
-	return 'ProcessError';
-}
-
-async function resetTrainingStatus(message = 'Preparing…'): Promise<void> {
-	try {
-		await fs.mkdir(path.dirname(trainingStatusPath()), { recursive: true });
-		await fs.writeFile(
-			trainingStatusPath(),
-			JSON.stringify({ status: 'idle', message, history: [] }, null, 2),
-		);
-	} catch { /* ignore */ }
-}
-
-async function readTrainingStatusFile(): Promise<TrainingStatusFile | null> {
-	try {
-		const raw = await fs.readFile(trainingStatusPath(), 'utf8');
-		return JSON.parse(raw) as TrainingStatusFile;
-	} catch {
-		return null;
-	}
-}
-
-function venvPythonPath(): string {
-	return path.join(coreRoot(), '.venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
-}
-
-function hasVenv(): boolean {
-	return fsSync.existsSync(venvPythonPath());
 }
 
 async function pullModelInternal(model: string): Promise<{ ok: boolean; message: string }> {
@@ -279,283 +101,23 @@ async function pullModelInternal(model: string): Promise<{ ok: boolean; message:
 	});
 }
 
-async function runSetupInternal(): Promise<SetupResult> {
-	const setupSh = path.join(coreRoot(), 'setup.sh');
-	const setupPs1 = path.join(coreRoot(), 'setup.ps1');
-	const useShell = process.platform !== 'win32';
-	const setup = useShell ? setupSh : setupPs1;
-	if (!fsSync.existsSync(setup)) {
-		return failStep('installing_deps', path.basename(setup) + ' not found', { errorType: 'FileNotFoundError' });
-	}
-	return new Promise(resolve => {
-		const proc = useShell
-			? spawn('bash', [setup], { cwd: coreRoot(), shell: false })
-			: spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', setup], { cwd: coreRoot(), shell: true });
-		let out = '';
-		proc.stdout?.on('data', d => { out += d; });
-		proc.stderr?.on('data', d => { out += d; });
-		proc.on('close', code => {
-			if (code === 0) resolve({ ok: true, message: 'Setup complete' });
-			else {
-				const detail = tailOutput(out);
-				const message = detail || `${path.basename(setup)} exited with code ${code}`;
-				resolve(failStep('installing_deps', message, {
-					errorType: inferErrorType(message),
-					detail,
-				}));
-			}
-		});
-		proc.on('error', err => {
-			resolve(failStep('installing_deps', err.message, { errorType: err.name, detail: err.message }));
-		});
-	});
+/** User-visible Copix directory: ~/Copix (settings.json lives here). */
+function copixDir(): string {
+	return path.join(app.getPath('home'), 'Copix');
 }
 
-async function buildDatasetInternal(): Promise<SetupResult> {
-	const script = path.join(coreRoot(), 'scripts', 'build_dataset.py');
-	return new Promise(resolve => {
-		const proc = spawnPython([script], { cwd: coreRoot(), shell: false });
-		let out = '';
-		proc.stdout?.on('data', d => { out += d; });
-		proc.stderr?.on('data', d => { out += d; });
-		proc.on('close', code => {
-			if (code === 0) resolve({ ok: true, message: 'Dataset built' });
-			else {
-				const detail = tailOutput(out);
-				const message = detail || `build_dataset.py exited with code ${code}`;
-				resolve(failStep('building_dataset', message, { errorType: 'DatasetBuildError', detail }));
-			}
-		});
-		proc.on('error', err => {
-			resolve(failStep('building_dataset', err.message, { errorType: err.name, detail: err.message }));
-		});
-	});
+function settingsPath(): string {
+	return path.join(copixDir(), 'settings.json');
 }
 
-async function exportInternal(): Promise<SetupResult> {
-	const script = path.join(coreRoot(), 'export_ollama.py');
-	return new Promise(resolve => {
-		const proc = spawnPython([script], { cwd: coreRoot(), shell: false });
-		let out = '';
-		proc.stdout?.on('data', d => { out += d; });
-		proc.stderr?.on('data', d => { out += d; });
-		proc.on('close', code => {
-			if (code === 0) resolve({ ok: true, message: 'copix-core registered in Ollama' });
-			else {
-				const detail = tailOutput(out, 2000);
-				const message = detail || `export_ollama.py exited with code ${code}`;
-				resolve(failStep('exporting', message, { errorType: 'OllamaExportError', detail }));
-			}
-		});
-		proc.on('error', err => {
-			resolve(failStep('exporting', err.message, { errorType: err.name, detail: err.message }));
-		});
-	});
+/** Legacy Electron userData config (migrated once into ~/Copix/settings.json). */
+function legacyConfigPath(): string {
+	return path.join(app.getPath('userData'), 'copix-config.json');
 }
 
-async function mergeExportCoreInternal(): Promise<SetupResult> {
-	const script = path.join(coreRoot(), 'export_ollama.py');
-	if (!fsSync.existsSync(script)) {
-		return failStep('exporting', `export_ollama.py not found at ${script}`, { errorType: 'FileNotFoundError' });
-	}
-	return new Promise(resolve => {
-		const proc = spawnPython([script, '--name', 'copix-core'], { cwd: coreRoot(), shell: false });
-		let out = '';
-		proc.stdout?.on('data', d => { out += d; });
-		proc.stderr?.on('data', d => { out += d; });
-		proc.on('close', code => {
-			if (code === 0) resolve({ ok: true, message: 'copix-core registered in Ollama' });
-			else {
-				const detail = tailOutput(out, 2000);
-				const message = detail || `export_ollama.py exited with code ${code}`;
-				resolve(failStep('exporting', message, { errorType: 'OllamaExportError', detail }));
-			}
-		});
-		proc.on('error', err => {
-			resolve(failStep('exporting', err.message, { errorType: err.name, detail: err.message }));
-		});
-	});
+function ensureCopixDir(): void {
+	fsSync.mkdirSync(copixDir(), { recursive: true });
 }
-
-async function startTrainingInternal(epochs: number): Promise<SetupResult> {
-	if (trainProc) return failStep('training', 'Training already running', { errorType: 'TrainingBusyError' });
-	const script = path.join(coreRoot(), 'train_gpt_oss.py');
-	if (!fsSync.existsSync(script)) {
-		return failStep('training', `train_gpt_oss.py not found at ${script}`, { errorType: 'FileNotFoundError' });
-	}
-	await resetTrainingStatus('Starting Copix Core training (openai/gpt-oss-20b LoRA)…');
-	trainStderr = '';
-	const py = resolvePython();
-	const args = [...py.prefixArgs, script, '--epochs', String(epochs)];
-	console.log('[copix] spawn training:', py.exe, args.join(' '));
-	try {
-		trainProc = spawn(py.exe, args, {
-			cwd: coreRoot(),
-			shell: false,
-			stdio: 'pipe',
-			env: { ...process.env, PYTHONUNBUFFERED: '1' },
-		});
-	} catch (err) {
-		const e = err instanceof Error ? err : new Error(String(err));
-		return failStep('training', e.message, { errorType: e.name, detail: e.stack });
-	}
-	trainProc.stdout?.on('data', d => console.log('[train]', d.toString()));
-	trainProc.stderr?.on('data', d => {
-		const chunk = d.toString();
-		trainStderr += chunk;
-		console.error('[train]', chunk);
-	});
-	trainProc.on('error', err => {
-		console.error('[copix] training spawn error:', err);
-		void writeTrainingCrashStatus(null, null);
-	});
-	trainProc.on('close', code => {
-		trainProc = undefined;
-		if (trainWatchTimer) clearInterval(trainWatchTimer);
-		void (async () => {
-			const status = await readTrainingStatusFile();
-			if (code === 0 && status?.status === 'completed') {
-				if (setupRunning) setSetup('exporting', 'Registering copix-core in Ollama…');
-				const exp = await mergeExportCoreInternal();
-				if (!exp.ok) {
-					console.error('[copix] export after train failed:', exp.message);
-					if (setupRunning) {
-						setSetupError(
-							'exporting',
-							exp.errorType ?? 'OllamaExportError',
-							exp.message,
-							exp.detail,
-						);
-					}
-				} else if (setupRunning) {
-					setSetup('done', 'Copix Core ready in Ollama as copix-core');
-				}
-			} else if (setupRunning && code !== 0) {
-				if (status?.status !== 'completed' && status?.status !== 'error') {
-					await writeTrainingCrashStatus(code, null);
-				}
-			}
-			broadcastTrainingStatus();
-		})();
-	});
-	trainWatchTimer = setInterval(broadcastTrainingStatus, 800);
-	return { ok: true, message: 'Copix Core training started (gpt-oss-20b)' };
-}
-
-function trainingFailure(status: TrainingStatusFile | null, fallbackMessage: string): SetupResult {
-	const stderrTail = trainStderr ? tailOutput(trainStderr, 2000) : undefined;
-	let message = status?.message ?? fallbackMessage;
-	const errorType = status?.error_type ?? 'TrainingError';
-	let detail = status?.detail ?? stderrTail;
-	// Avoid showing bare exception class names with no context
-	if (message === errorType && detail) message = detail;
-	else if (!message || message === 'TypeError' || message === 'Error') {
-		message = fallbackMessage;
-	}
-	if (status) currentSetup = { ...currentSetup, training: status as Record<string, unknown> };
-	return failStep('training', message, { errorType, detail });
-}
-
-async function writeTrainingCrashStatus(code: number | null, signal: NodeJS.Signals | null): Promise<void> {
-	const detail = trainStderr ? tailOutput(trainStderr, 2000) : undefined;
-	const codeLabel = code === null ? (signal ? `signal ${signal}` : 'unknown') : String(code);
-	const message = detail
-		? `Training process crashed (exit ${codeLabel}). See detail below.`
-		: `Training process crashed (exit ${codeLabel}) while loading or fine-tuning the model.`;
-	try {
-		await fs.mkdir(path.dirname(trainingStatusPath()), { recursive: true });
-		await fs.writeFile(trainingStatusPath(), JSON.stringify({
-			status: 'error',
-			error_type: 'TrainingCrashError',
-			failed_step: 'loading_model',
-			message,
-			detail,
-			history: [],
-		}, null, 2), 'utf8');
-	} catch { /* ignore */ }
-}
-
-async function waitForTraining(): Promise<SetupResult> {
-	const deadline = Date.now() + 6 * 60 * 60 * 1000;
-	while (Date.now() < deadline) {
-		if (setupAbort) return { ok: false, message: 'Setup cancelled' };
-		const status = await readTrainingStatusFile();
-		if (status?.status === 'completed') return { ok: true, message: 'Training complete' };
-		if (status?.status === 'error') return trainingFailure(status, 'Training failed');
-		if (!trainProc) {
-			const finalStatus = await readTrainingStatusFile();
-			if (finalStatus?.status === 'completed') return { ok: true, message: 'Training complete' };
-			if (finalStatus?.status === 'error') return trainingFailure(finalStatus, 'Training failed');
-			if (finalStatus?.status === 'running') {
-				return trainingFailure(finalStatus, 'Training stopped unexpectedly while loading the model');
-			}
-			return trainingFailure(finalStatus, 'Training stopped unexpectedly');
-		}
-		await new Promise(r => setTimeout(r, 2000));
-	}
-	return failStep('training', 'Training timed out after 6 hours', { errorType: 'TimeoutError' });
-}
-
-function normalizeEpochs(epochs: unknown): number {
-	const n = typeof epochs === 'number' ? epochs : Number(epochs);
-	return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 10) : 3;
-}
-
-function setupExceptionResult(err: unknown): SetupResult {
-	const e = err instanceof Error ? err : new Error(String(err));
-	console.error('[copix] model setup error:', e);
-	return failStep(activeSetupStep, e.message || 'Setup failed unexpectedly', {
-		errorType: e.name || 'Error',
-		detail: e.stack,
-	});
-}
-
-/**
- * Simple setup: make sure Ollama is running and gpt-oss:20b is pulled, then done.
- * Fine-tuning is optional and available separately via copix:startTraining.
- */
-async function runModelSetupPipeline(_epochs: unknown = 3): Promise<SetupResult> {
-	if (setupRunning) {
-		return failStep('checking_ollama', 'Setup already running', { errorType: 'SetupBusyError' });
-	}
-	setupRunning = true;
-	setupAbort = false;
-	activeSetupStep = 'checking_ollama';
-	try {
-		setSetup('checking_ollama', 'Checking Ollama…');
-		const s = await fetchOllamaStatus();
-		if (setupAbort) return { ok: false, message: 'Setup cancelled' };
-		if (!s.online) {
-			return failStep(
-				'checking_ollama',
-				'Ollama not running — install from ollama.com and keep it open',
-				{ errorType: 'OllamaOfflineError' },
-			);
-		}
-
-		if (!s.hasBase && !s.hasTuned) {
-			setSetup('pulling', 'Downloading gpt-oss:20b (~13GB). This may take a while…');
-			const pull = await pullModelInternal('gpt-oss:20b');
-			if (setupAbort) return { ok: false, message: 'Setup cancelled' };
-			if (!pull.ok) {
-				const detail = tailOutput(pull.message, 2000);
-				return failStep('pulling', detail || 'ollama pull failed', {
-					errorType: 'OllamaPullError',
-					detail,
-				});
-			}
-		}
-
-		setSetup('done', 'gpt-oss:20b is ready — start chatting!');
-		return { ok: true, message: 'Setup complete' };
-	} catch (err) {
-		return setupExceptionResult(err);
-	} finally {
-		setupRunning = false;
-	}
-}
-
-const configPath = () => path.join(app.getPath('userData'), 'copix-config.json');
 
 function defaultUserProjectsRoot(): string {
 	return app.getPath('home');
@@ -563,7 +125,7 @@ function defaultUserProjectsRoot(): string {
 
 function readWorkspaceHome(): string {
 	try {
-		const raw = fsSync.readFileSync(configPath(), 'utf8');
+		const raw = fsSync.readFileSync(settingsPath(), 'utf8');
 		const settings = JSON.parse(raw) as { workspace?: { homeDirectory?: string } };
 		const home = settings.workspace?.homeDirectory?.trim();
 		if (home && !/copix-output/i.test(home.replace(/\\/g, '/'))) {
@@ -849,15 +411,27 @@ async function loadRenderer(): Promise<void> {
 app.whenReady().then(() => {
 	ipcMain.handle('copix:getSettings', async () => {
 		try {
-			const raw = await fs.readFile(configPath(), 'utf8');
-			return JSON.parse(raw);
+			ensureCopixDir();
+			const primary = settingsPath();
+			if (fsSync.existsSync(primary)) {
+				return JSON.parse(await fs.readFile(primary, 'utf8'));
+			}
+			const legacy = legacyConfigPath();
+			if (fsSync.existsSync(legacy)) {
+				const raw = await fs.readFile(legacy, 'utf8');
+				const parsed = JSON.parse(raw);
+				await fs.writeFile(primary, JSON.stringify(parsed, null, 2), 'utf8');
+				return parsed;
+			}
+			return null;
 		} catch {
 			return null;
 		}
 	});
 
 	ipcMain.handle('copix:setSettings', async (_e, settings: unknown) => {
-		await fs.writeFile(configPath(), JSON.stringify(settings, null, 2), 'utf8');
+		ensureCopixDir();
+		await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), 'utf8');
 	});
 
 	ipcMain.handle('copix:getProjectsRoot', async () => {
@@ -1048,8 +622,6 @@ function looksLikeSecretPath(filePath: string): boolean {
 
 	ipcMain.handle('copix:openExternal', (_e, url: string) => shell.openExternal(url));
 
-	ipcMain.handle('copix:getCoreRoot', () => coreRoot());
-
 	ipcMain.handle('copix:getServerStatus', () => fetchServerHealth());
 
 	ipcMain.handle('copix:startServer', async () => {
@@ -1057,61 +629,11 @@ function looksLikeSecretPath(filePath: string): boolean {
 		if (!s.online) {
 			return { ok: false, message: 'Ollama not running — install from ollama.com and open the Ollama app' };
 		}
-		if (s.hasTuned) return { ok: true, message: 'copix-core ready in Ollama', adapter: true };
-		if (s.hasBase) return { ok: true, message: 'Local Ollama model ready', adapter: false };
-		return { ok: false, message: 'Pull gpt-oss:20b in the Model panel first' };
+		if (s.hasModel) return { ok: true, message: `Ollama · ${DEFAULT_OLLAMA_MODEL} ready` };
+		return { ok: false, message: `Pull ${DEFAULT_OLLAMA_MODEL} in Settings → Models first` };
 	});
 
-	ipcMain.handle('copix:pullOllamaModel', async (_e, model = 'gpt-oss:20b') => pullModelInternal(model));
-
-	ipcMain.handle('copix:exportToOllama', () => exportInternal());
-
-	ipcMain.handle('copix:stopServer', () => {
-		serverProc?.kill();
-		serverProc = undefined;
-		return { ok: true };
-	});
-
-	ipcMain.handle('copix:buildDataset', () => buildDatasetInternal());
-
-	ipcMain.handle('copix:startTraining', async (_e, epochs = 3) => startTrainingInternal(normalizeEpochs(epochs)));
-
-	ipcMain.handle('copix:stopTraining', () => {
-		trainProc?.kill();
-		trainProc = undefined;
-		if (trainWatchTimer) clearInterval(trainWatchTimer);
-		return { ok: true };
-	});
-
-	ipcMain.handle('copix:getTrainingStatus', async () => {
-		try {
-			const raw = await fs.readFile(trainingStatusPath(), 'utf8');
-			return JSON.parse(raw);
-		} catch {
-			return { status: 'idle', message: 'No training run yet', history: [] };
-		}
-	});
-
-	ipcMain.handle('copix:runCoreSetup', () => runSetupInternal());
-
-	ipcMain.handle('copix:runModelSetup', async (_e, epochs = 3) => {
-		try {
-			return await runModelSetupPipeline(epochs);
-		} catch (err) {
-			return setupExceptionResult(err);
-		}
-	});
-
-	ipcMain.handle('copix:cancelModelSetup', () => {
-		setupAbort = true;
-		trainProc?.kill();
-		trainProc = undefined;
-		if (trainWatchTimer) clearInterval(trainWatchTimer);
-		setSetup('idle', 'Setup cancelled');
-		return { ok: true };
-	});
-
-	ipcMain.handle('copix:getSetupProgress', () => currentSetup);
+	ipcMain.handle('copix:pullOllamaModel', async (_e, model = DEFAULT_OLLAMA_MODEL) => pullModelInternal(model));
 
 	createWindow();
 });

@@ -1,10 +1,9 @@
 import type { ThemePreference } from '../types';
-import { IconCloud, IconFolder, IconMonitor, IconMoon, IconSun } from './Icons';
+import { IconFolder, IconMonitor, IconMoon, IconSun } from './Icons';
 
 interface Props {
 	workspace?: string;
 	model: string;
-	provider: 'local' | 'cloud';
 	online: boolean;
 	theme: ThemePreference;
 	onCycleTheme: () => void;
@@ -17,7 +16,7 @@ const THEME_LABEL: Record<ThemePreference, string> = {
 	light: 'Light theme',
 };
 
-export function StatusBar({ workspace, model, provider, online, theme, onCycleTheme, onOpenSettings }: Props) {
+export function StatusBar({ workspace, model, online, theme, onCycleTheme, onOpenSettings }: Props) {
 	const ThemeIcon = theme === 'system' ? IconMonitor : theme === 'light' ? IconSun : IconMoon;
 	return (
 		<footer className="statusbar">
@@ -31,10 +30,9 @@ export function StatusBar({ workspace, model, provider, online, theme, onCycleTh
 			</div>
 			<div className="statusbar-right">
 				<button type="button" className="status-item status-btn" title="Model settings" onClick={onOpenSettings}>
-					{provider === 'cloud' && <IconCloud width={12} height={12} />}
 					<span className={`status-dot ${online ? 'on' : 'off'}`} />
 					{model}
-					<span className="status-sub">{provider === 'cloud' ? 'cloud' : 'local'}</span>
+					<span className="status-sub">ollama</span>
 				</button>
 				<button type="button" className="status-item status-btn" title={`${THEME_LABEL[theme]} — click to switch`} onClick={onCycleTheme}>
 					<ThemeIcon width={13} height={13} />

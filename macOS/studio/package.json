@@ -14,7 +14,6 @@
     "build": "vite build",
     "prestart": "npm run build",
     "start": "node scripts/check-build.mjs && electron .",
-    "core:dev": "node copix-core/dev-server.mjs",
     "studio": "vite",
     "studio:test": "npm run build && node scripts/check-build.mjs && electron .",
     "studio:app": "npm run dist:dir && open release/staging/mac*/Copix.app",
@@ -63,18 +62,6 @@
       "package.json"
     ],
     "extraResources": [
-      {
-        "from": "copix-core",
-        "to": "copix-core",
-        "filter": [
-          "**/*",
-          "!.venv/**",
-          "!output/**",
-          "!tools/**",
-          "!**/__pycache__/**",
-          "!**/*.pyc"
-        ]
-      },
       {
         "from": "build/icon.png",
         "to": "icon.png"

@@ -6,6 +6,7 @@ import { buildSystemPrompt } from './systemPrompt.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
 import { assertSafeFilePath } from '../utils/secrets.js';
+import { isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
 
 export interface AgentContext {
 	sessionId: string;
@@ -29,7 +30,7 @@ Scaffold a new git-initialized project folder.
 
 **When to use:** User asks for a new app, site, or repo from scratch.
 
-**Output location:** \`C:/Users/<you>/<kebab-name>\` unless \`outputPath\` is set.
+**Output location:** \`${projectPathExample('<kebab-name>')}\` unless \`outputPath\` is set.
 
 **Parameters:**
 - \`name\` (required) — kebab-case project name you generate
@@ -186,14 +187,14 @@ List files and folders in a directory.
 		function: {
 			name: 'run_terminal',
 			description: `## run_terminal
-Execute a PowerShell command on the user's machine.
+Execute a ${shellLabel()} command on the user's machine.
 
 **When to use:** Build, test, install packages, run scripts.
 
 **Parameters:**
 - \`command\` (required)
 - \`cwd\` — working directory (defaults to workspace)
-- \`elevate\` — \`true\` for Administrator / UAC (installs, system paths)`,
+- \`elevate\` — \`true\` for ${isWindows() ? 'Administrator / UAC' : 'administrator / sudo'} (installs, system paths)`,
 			parameters: {
 				type: 'object',
 				properties: {
@@ -201,7 +202,9 @@ Execute a PowerShell command on the user's machine.
 					cwd: { type: 'string' },
 					elevate: {
 						type: 'boolean',
-						description: 'Run elevated as Administrator (Windows UAC prompt)',
+						description: isWindows()
+							? 'Run elevated as Administrator (Windows UAC prompt)'
+							: 'Run elevated with administrator privileges (macOS auth prompt / sudo)',
 					},
 				},
 				required: ['command'],
@@ -369,7 +372,7 @@ async function executeTool(
 
 function needsElevateHint(command: string): boolean {
 	const c = command.toLowerCase();
-	return /\b(sudo|runas|pkexec|bcdedit|dism\s|reg\s+add|takeown|icacls|winget\s+install|choco\s+install|install-windowsfeature)\b/.test(c);
+	return /\b(sudo|runas|pkexec|bcdedit|dism\s|reg\s+add|takeown|icacls|winget\s+install|choco\s+install|install-windowsfeature|brew\s+install|installer\s+-pkg)\b/.test(c);
 }
 
 async function executeStructuredActions(
@@ -410,7 +413,6 @@ async function streamCompletion(
 	opts: { tools?: typeof TOOLS; emitText?: boolean },
 ): Promise<{ assistantText: string; toolCalls: Map<number, { id: string; name: string; args: string }> }> {
 	const url = resolveChatUrl(config);
-	const isLocal = config.provider === 'local';
 	let thinking = true;
 	callbacks.onThinkingStart();
 	const endThinking = () => {
@@ -423,36 +425,32 @@ async function streamCompletion(
 	try {
 		res = await fetch(url, {
 		method: 'POST',
-		headers: buildHeaders(config),
+		headers: buildHeaders(),
 		body: JSON.stringify({
 			model: config.model,
 			messages,
 			...(opts.tools ? { tools: opts.tools } : {}),
 			stream: true,
-			temperature: isLocal ? 0.1 : 0.2,
-			...(isLocal
-				? {
-					options: {
-						...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 4096 }),
-						num_predict: 2048,
-						num_batch: 512,
-						keep_alive: '10m',
-					},
-				}
-				: {}),
+			temperature: 0.1,
+			options: {
+				...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 4096 }),
+				num_predict: 2048,
+				num_batch: 512,
+				keep_alive: '10m',
+			},
 		}),
 		signal,
 	});
 	} catch (err) {
 		if (signal.aborted) return { assistantText: '', toolCalls: new Map() };
 		const msg = err instanceof Error ? err.message : String(err);
-		const label = config.provider === 'cloud' ? 'Copix Cloud' : 'Ollama';
+		const label = 'Ollama';
 		throw new Error(`Cannot reach ${label} at ${config.baseUrl} — ${msg}`);
 	}
 
 	if (!res.ok) {
 		const errText = await res.text().catch(() => '');
-		const label = config.provider === 'cloud' ? 'Copix Cloud' : 'Ollama';
+		const label = 'Ollama';
 		let message = errText.slice(0, 800) || res.statusText;
 		try {
 			const parsed = JSON.parse(errText) as { error?: { message?: string } };
@@ -505,8 +503,8 @@ async function streamCompletion(
 	return { assistantText, toolCalls };
 }
 
-function buildHeaders(config: ModelConfig): Record<string, string> {
-	return buildModelHeaders(config);
+function buildHeaders(): Record<string, string> {
+	return buildModelHeaders();
 }
 
 function historyToMessages(messages: Array<{ role: string; content: string }>, maxTurns = 12): ChatMsg[] {
@@ -522,7 +520,6 @@ function historyToMessages(messages: Array<{ role: string; content: string }>, m
 
 export interface AgentRunOptions {
 	mode?: AgentMode;
-	customRules?: string[];
 }
 
 export async function runAgent(
@@ -534,21 +531,19 @@ export async function runAgent(
 	callbacks: AgentCallbacks,
 	options: AgentRunOptions = {},
 ): Promise<void> {
-	const isLocal = config.provider === 'local';
 	const messages: ChatMsg[] = [
 		{
 			role: 'system',
 			content: buildSystemPrompt({
 				mode: options.mode ?? 'code',
 				workspaceRoot: ctx.workspaceRoot,
-				customRules: options.customRules,
 			}),
 		},
-		...historyToMessages(priorMessages, isLocal ? 8 : 16),
+		...historyToMessages(priorMessages, 8),
 		{ role: 'user', content: userMessage },
 	];
 
-	const maxRounds = isLocal ? 10 : 16;
+	const maxRounds = 10;
 	let hadToolUse = false;
 
 	for (let i = 0; i < maxRounds; i++) {

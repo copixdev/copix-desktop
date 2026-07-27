@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChatSession } from '../hooks/chatSessions';
 import type { WorkspaceEnvironment } from '../models/agentModes';
-import { PLANS } from '../services/subscription';
-import type { SubscriptionPlan } from '../types';
 import {
 	IconPlus, IconFolder, IconSettings, IconChat, IconCommand, IconSparkle, IconPanelRight, IconChevron,
 } from './Icons';
@@ -13,15 +11,12 @@ interface Props {
 	workspace?: string;
 	workspaceEnv?: WorkspaceEnvironment;
 	repoUrl?: string;
-	accountName?: string;
-	plan?: SubscriptionPlan;
 	serverOnline?: boolean;
 	onSelectSession: (id: string) => void;
 	onNewChat: () => void;
 	onOpenFolder: () => void;
 	onCloneRepo: (url: string) => void;
 	onOpenSettings: () => void;
-	onOpenSetup: () => void;
 	onOpenPalette?: () => void;
 	onTogglePinSession: (id: string) => void;
 	onArchiveSession: (id: string) => void;
@@ -55,8 +50,8 @@ function relativeTime(ts: number): string {
 }
 
 export function Sidebar({
-	sessions, activeId, workspace, accountName, plan = 'free',
-	onSelectSession, onNewChat, onOpenFolder, onCloneRepo, onOpenSettings, onOpenSetup,
+	sessions, activeId, workspace,
+	onSelectSession, onNewChat, onOpenFolder, onCloneRepo, onOpenSettings,
 	onOpenPalette, onTogglePinSession, onDeleteSession,
 }: Props) {
 	const [cloneInput, setCloneInput] = useState('');
@@ -121,9 +116,6 @@ export function Sidebar({
 
 	const isExpanded = (path: string) => expanded[path] ?? path === workspace;
 
-	const initial = (accountName || 'U').slice(0, 1).toUpperCase();
-	const planLabel = PLANS.find(p => p.id === plan)?.label ?? 'Free';
-
 	return (
 		<aside className="sidebar sidebar-v2">
 			<div className="sidebar-top-actions">
@@ -134,10 +126,6 @@ export function Sidebar({
 				<button type="button" className="sidebar-action" onClick={onOpenPalette}>
 					<IconCommand width={15} height={15} />
 					<span>Search</span>
-				</button>
-				<button type="button" className="sidebar-action" onClick={onOpenSetup}>
-					<IconChat width={15} height={15} />
-					<span>Automations</span>
 				</button>
 				<button type="button" className="sidebar-action" onClick={onOpenSettings}>
 					<IconPanelRight width={15} height={15} />
@@ -321,10 +309,10 @@ export function Sidebar({
 
 			<footer className="sidebar-profile">
 				<div className="sidebar-profile-left">
-					<span className="settings-avatar">{initial}</span>
+					<span className="settings-avatar">C</span>
 					<div className="sidebar-profile-text">
-						<div className="settings-user-name fade-edge">{accountName || 'User'}</div>
-						<div className="settings-user-plan">{planLabel} Plan</div>
+						<div className="settings-user-name fade-edge">Copix</div>
+						<div className="settings-user-plan">Free</div>
 					</div>
 				</div>
 				<button type="button" className="btn-icon" title="Settings" onClick={onOpenSettings}>

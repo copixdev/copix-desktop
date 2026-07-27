@@ -7,7 +7,6 @@ export interface TitleBarMenuActions {
 	onToggleEditor?: () => void;
 	onOpenSettings?: () => void;
 	onOpenPalette?: () => void;
-	onOpenSetup?: () => void;
 }
 
 interface Props extends TitleBarMenuActions {}
@@ -76,7 +75,6 @@ export function TitleBarMenu(props: Props) {
 							{m.id === 'view' && (
 								<>
 									{item('Toggle Editor Panel', props.onToggleEditor)}
-									{item('Model Setup…', props.onOpenSetup)}
 								</>
 							)}
 							{m.id === 'help' && (

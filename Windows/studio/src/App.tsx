@@ -4,10 +4,8 @@ import { ActivityRail } from './components/ActivityRail';
 import { ChatCenter } from './components/ChatCenter';
 import { CommandPalette, type PaletteCommand } from './components/CommandPalette';
 import { EditorArea, type SidePanelMode } from './components/EditorArea';
-import { ModelSetupWizard } from './components/ModelSetupWizard';
 import { ResizableLayout } from './components/ResizableLayout';
 import { SettingsPage } from './components/SettingsPage';
-import { PaymentPage, type PaidPlan } from './components/PaymentPage';
 import { Sidebar } from './components/Sidebar';
 import { StatusBar } from './components/StatusBar';
 import { ToastProvider } from './components/Toast';
@@ -15,13 +13,8 @@ import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData
 import { DEFAULT_SETTINGS, AppSettings, ThemePreference } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { IconPlus, IconBranch } from './components/Icons';
-import { LoginPage } from './components/LoginPage';
 import { TitleBarMenu } from './components/TitleBarMenu';
-import { getRemoteSession, isSupabaseConfigured, resolveAuthConfig, type AuthSession } from './services/auth';
-import { pullProfileFromSupabase, pushProfileToSupabase } from './services/supabaseProfile';
-import { COPIX_SUPABASE_ANON_KEY, COPIX_SUPABASE_URL } from './services/supabaseConfig';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
-import { getPlan } from './services/subscription';
 
 function resolveTheme(pref: ThemePreference, systemLight: boolean): 'light' | 'dark' {
 	if (pref === 'system') return systemLight ? 'light' : 'dark';
@@ -49,15 +42,9 @@ function AppInner() {
 	});
 	const [activeSessionId, setActiveSessionId] = useState(() => sessions[0]?.id ?? '');
 	const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-	const [authReady, setAuthReady] = useState(false);
-	const [authed, setAuthed] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const [payPlan, setPayPlan] = useState<PaidPlan | null>(null);
-	const [setupOpen, setSetupOpen] = useState(false);
-	const [setupMinimized, setSetupMinimized] = useState(false);
 	const [tree, setTree] = useState<string[]>([]);
 	const [serverOnline, setServerOnline] = useState(false);
-	const [hasTunedModel, setHasTunedModel] = useState(false);
 	const [editorVisible, setEditorVisible] = useState(true);
 	const [panelMode, setPanelMode] = useState<SidePanelMode>('hub');
 	const [reviewFiles, setReviewFiles] = useState<FileChange[] | null>(null);
@@ -67,8 +54,6 @@ function AppInner() {
 
 	const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
 	const workspace = activeSession?.workspaceRoot;
-	const accountName = settings.accounts.find(a => a.id === settings.activeAccountId)?.displayName;
-	const accountEmail = settings.accounts.find(a => a.id === settings.activeAccountId)?.email;
 	const openAgentTabs = useMemo(
 		() => sessions.filter(s => !s.archived).slice(0, 8),
 		[sessions],
@@ -83,24 +68,6 @@ function AppInner() {
 
 	useEffect(() => { saveSessions(sessions); }, [sessions]);
 
-	const applyAuthSession = useCallback(async (session: AuthSession) => {
-		const auth = resolveAuthConfig();
-		const next: AppSettings = {
-			...settings,
-			auth,
-			activeAccountId: session.userId,
-			accounts: [{
-				id: session.userId,
-				displayName: session.displayName,
-				email: session.email,
-				createdAt: Date.now(),
-			}],
-		};
-		const remote = await pullProfileFromSupabase(next);
-		setSettings(remote ? { ...next, ...remote, auth } : next);
-		setAuthed(true);
-	}, [settings]);
-
 	useEffect(() => {
 		copix.getSettings().then(s => {
 			if (!s) return;
@@ -111,8 +78,7 @@ function AppInner() {
 				model: {
 					...DEFAULT_SETTINGS.model,
 					...raw.model,
-					provider: raw.model?.provider ?? DEFAULT_SETTINGS.model.provider,
-					apiKey: raw.model?.apiKey ?? '',
+					modelId: raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId,
 				},
 				layout: { ...DEFAULT_SETTINGS.layout, ...raw.layout },
 				workspace: {
@@ -123,45 +89,13 @@ function AppInner() {
 						: (raw.workspace?.homeDirectory ?? DEFAULT_SETTINGS.workspace.homeDirectory),
 				},
 				theme: raw.theme ?? DEFAULT_SETTINGS.theme,
-				auth: {
-					...DEFAULT_SETTINGS.auth,
-					...raw.auth,
-					supabaseUrl: COPIX_SUPABASE_URL || raw.auth?.supabaseUrl,
-					supabaseAnonKey: COPIX_SUPABASE_ANON_KEY || raw.auth?.supabaseAnonKey,
-					provider: isSupabaseConfigured({
-						...DEFAULT_SETTINGS.auth,
-						...raw.auth,
-						supabaseUrl: COPIX_SUPABASE_URL || raw.auth?.supabaseUrl,
-						supabaseAnonKey: COPIX_SUPABASE_ANON_KEY || raw.auth?.supabaseAnonKey,
-					}) ? 'supabase' : 'local',
-				},
-				subscription: { ...DEFAULT_SETTINGS.subscription, ...raw.subscription },
-				systemPrompt: { ...DEFAULT_SETTINGS.systemPrompt, ...raw.systemPrompt },
-				modelSetup: { ...DEFAULT_SETTINGS.modelSetup, ...raw.modelSetup },
 			});
 		});
 	}, []);
 
 	useEffect(() => { copix.setSettings(settings); }, [settings]);
 
-	useEffect(() => {
-		const auth = resolveAuthConfig(settings.auth);
-		if (!isSupabaseConfigured(auth)) {
-			setAuthed(true);
-			setAuthReady(true);
-			return;
-		}
-		void getRemoteSession(auth).then(async session => {
-			if (session?.accessToken) await applyAuthSession(session);
-			setAuthReady(true);
-		}).catch(() => setAuthReady(true));
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
 
-	useEffect(() => {
-		if (!authed || !isSupabaseConfigured(settings.auth)) return;
-		void pushProfileToSupabase(settings).catch(() => { /* best-effort sync */ });
-	}, [authed, settings.subscription.plan, settings.subscription.status, settings.accounts, settings.activeAccountId]);
 
 	// Theme: light/dark with live system sync
 	useEffect(() => {
@@ -177,17 +111,11 @@ function AppInner() {
 	}, [settings.theme]);
 
 	useEffect(() => {
-		const poll = () => copix.getServerStatus().then(s => {
-			setServerOnline(s.online);
-			setHasTunedModel(Boolean(s.hasTuned || s.adapter));
-			if (!s.hasBase && !s.hasTuned && !settings.modelSetup.completed && !settings.modelSetup.skipped) {
-				setSetupOpen(true);
-			}
-		});
+		const poll = () => copix.getServerStatus().then(s => setServerOnline(s.online));
 		poll();
 		const t = setInterval(poll, 4000);
 		return () => clearInterval(t);
-	}, [settings.modelSetup.completed, settings.modelSetup.skipped]);
+	}, []);
 
 	useEffect(() => {
 		if (!activeSession) return;
@@ -367,17 +295,6 @@ function AppInner() {
 		});
 	}, [ensureActiveSession]);
 
-	const handleSetupComplete = () => {
-		setSettings(prev => ({ ...prev, modelSetup: { ...prev.modelSetup, completed: true } }));
-		setSetupOpen(false);
-		setSetupMinimized(false);
-	};
-
-	const handleSetupSkip = () => {
-		setSettings(prev => ({ ...prev, modelSetup: { ...prev.modelSetup, skipped: true } }));
-		setSetupOpen(false);
-	};
-
 	const workspaceEnv = activeSession?.workspaceEnv
 		?? inferWorkspaceEnv(activeSession?.repoUrl, Boolean(workspace));
 
@@ -397,17 +314,8 @@ function AppInner() {
 		{ id: 'theme-system', label: 'Theme: sync with system', run: () => setSettings(prev => ({ ...prev, theme: 'system' })) },
 		{ id: 'theme-dark', label: 'Theme: dark', run: () => setSettings(prev => ({ ...prev, theme: 'dark' })) },
 		{ id: 'theme-light', label: 'Theme: light', run: () => setSettings(prev => ({ ...prev, theme: 'light' })) },
-		{ id: 'settings', label: 'Open settings', hint: 'Models, appearance, account', run: () => setSettingsOpen(true) },
-		{ id: 'setup', label: 'Model setup', hint: 'Download or repair gpt-oss:20b', run: () => { setSetupOpen(true); setSetupMinimized(false); } },
+		{ id: 'settings', label: 'Open settings', hint: 'Models, appearance, workspace', run: () => setSettingsOpen(true) },
 	];
-
-	if (!authReady) {
-		return <div className="login-screen" aria-busy="true" />;
-	}
-
-	if (!authed) {
-		return <LoginPage onAuthenticated={session => { void applyAuthSession(session); }} />;
-	}
 
 	return (
 		<div className="shell">
@@ -423,7 +331,6 @@ function AppInner() {
 					onToggleEditor={() => setEditorVisible(v => !v)}
 					onOpenSettings={() => setSettingsOpen(true)}
 					onOpenPalette={() => setPaletteOpen(true)}
-					onOpenSetup={() => { setSetupOpen(true); setSetupMinimized(false); }}
 				/>
 				<span className="titlebar-drag" />
 			</header>
@@ -451,20 +358,8 @@ function AppInner() {
 						<IconPlus width={12} height={12} />
 					</button>
 				</div>
-				<span className="titlebar-title">Copix · {getPlan(settings.subscription.plan).label}</span>
+				<span className="titlebar-title">Copix</span>
 			</div>
-
-			{(setupOpen || setupMinimized) && (
-				<ModelSetupWizard
-					open={setupOpen}
-					minimized={setupMinimized}
-					onMinimize={() => { setSetupMinimized(true); setSetupOpen(false); }}
-					onExpand={() => { setSetupMinimized(false); setSetupOpen(true); }}
-					onClose={() => { setSetupOpen(false); setSetupMinimized(false); }}
-					onComplete={handleSetupComplete}
-					onSkip={handleSetupSkip}
-				/>
-			)}
 
 			<div className="shell-body">
 				<ActivityRail
@@ -491,15 +386,12 @@ function AppInner() {
 						workspace={workspace}
 						workspaceEnv={workspaceEnv}
 						repoUrl={activeSession?.repoUrl}
-						accountName={accountName}
-						plan={settings.subscription.plan}
 						serverOnline={serverOnline}
 						onSelectSession={setActiveSessionId}
 						onNewChat={handleNewChat}
 						onOpenFolder={openFolder}
 						onCloneRepo={cloneRepo}
 						onOpenSettings={() => setSettingsOpen(true)}
-						onOpenSetup={() => { setSetupOpen(true); setSetupMinimized(false); }}
 						onOpenPalette={() => setPaletteOpen(true)}
 						onTogglePinSession={togglePinSession}
 						onArchiveSession={archiveSession}
@@ -517,7 +409,6 @@ function AppInner() {
 						onMessagesChange={(msgs, title) =>
 							patchSession(activeSessionId, { messages: msgs, ...(title ? { title } : {}) })}
 						onWorkspaceChange={refreshWorkspace}
-						onOpenSetup={() => { setSetupOpen(true); setSetupMinimized(false); }}
 						onOpenSettings={() => setSettingsOpen(true)}
 						onAgentModeChange={mode => setSettings(prev => ({ ...prev, agentMode: mode }))}
 						onOpenFile={path => {
@@ -576,9 +467,8 @@ function AppInner() {
 
 			<StatusBar
 				workspace={workspace}
-				model={settings.model.preferTuned && hasTunedModel ? settings.model.tunedModelId : settings.model.modelId}
-				provider={settings.model.provider}
-				online={serverOnline || (settings.model.provider === 'cloud' && Boolean(settings.model.apiKey))}
+				model={settings.model.modelId}
+				online={serverOnline}
 				theme={settings.theme}
 				onCycleTheme={cycleTheme}
 				onOpenSettings={() => setSettingsOpen(true)}
@@ -595,19 +485,6 @@ function AppInner() {
 				settings={settings}
 				onClose={() => setSettingsOpen(false)}
 				onChange={setSettings}
-				onOpenSetup={() => { setSettingsOpen(false); setSetupOpen(true); setSetupMinimized(false); }}
-				onSignedOut={() => setAuthed(false)}
-				onUpgradePlan={plan => {
-					setSettingsOpen(false);
-					setPayPlan(plan);
-				}}
-			/>
-
-			<PaymentPage
-				open={Boolean(payPlan)}
-				plan={payPlan ?? 'pro'}
-				email={accountEmail}
-				onClose={() => setPayPlan(null)}
 			/>
 		</div>
 	);

@@ -34,7 +34,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconSend, IconPlay, IconCloud, IconChevron, IconCopy } from './Icons';
+import { IconSend, IconPlay, IconChevron, IconCopy } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
@@ -65,8 +65,6 @@ interface Props {
 	onMessagesChange: (msgs: ChatMessage[], title?: string) => void;
 
 	onWorkspaceChange: (root: string) => void;
-
-	onOpenSetup: () => void;
 
 	onOpenSettings: () => void;
 
@@ -181,7 +179,7 @@ function AssistantTurn({
 
 export function ChatCenter({
 
-	sessionId, workspace, settings, messages, onMessagesChange, onWorkspaceChange, onOpenSetup, onOpenSettings,
+	sessionId, workspace, settings, messages, onMessagesChange, onWorkspaceChange, onOpenSettings,
 	tree = [], onAgentModeChange, onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
 
 }: Props) {
@@ -212,7 +210,7 @@ export function ChatCenter({
 
 	const [showScroll, setShowScroll] = useState(false);
 
-	const [server, setServer] = useState<{ online: boolean; adapter?: boolean }>({ online: false });
+	const [server, setServer] = useState<{ online: boolean }>({ online: false });
 
 	const [starting, setStarting] = useState(false);
 
@@ -230,20 +228,13 @@ export function ChatCenter({
 
 
 
-	// Only route to the tuned model when it actually exists in Ollama; otherwise use base gpt-oss.
-	const config = settingsToConfig({
-		...settings.model,
-		preferTuned: settings.model.preferTuned && Boolean(server.adapter),
-	});
+	const config = settingsToConfig(settings.model);
 
 	const account = settings.accounts.find(a => a.id === settings.activeAccountId);
 
 	const agentMode = settings.agentMode;
 
-	// Cloud providers don't need local Ollama — a configured API key means we're ready.
-	const isCloud = settings.model.provider === 'cloud';
-
-	const modelReady = isCloud ? Boolean(settings.model.apiKey) : server.online;
+	const modelReady = server.online;
 
 	const demoActivities = useMemo(
 		() => (SHOW_ACTIVITY_DEMO ? createDemoActivities() : []),
@@ -325,8 +316,6 @@ export function ChatCenter({
 
 			setServer(await copix.getServerStatus());
 
-			if (!r.ok) onOpenSetup();
-
 		} finally {
 
 			setStarting(false);
@@ -345,7 +334,7 @@ export function ChatCenter({
 
 		if (!modelReady) {
 
-			toast(isCloud ? 'Add your cloud API key in Settings first' : 'Start Copix Core server first', 'err');
+			toast('Start Ollama and pull qwen2.5:3b first', 'err');
 
 			return;
 
@@ -480,7 +469,7 @@ export function ChatCenter({
 
 				},
 
-				{ mode: agentMode, customRules: settings.systemPrompt.customRules },
+				{ mode: agentMode },
 
 			);
 
@@ -606,21 +595,11 @@ export function ChatCenter({
 
 			{!modelReady && (
 				<div className="banner banner-warn">
-					{isCloud ? (
-						<>
-							<span>Cloud model needs an API key — grab a free key from OpenRouter or Groq.</span>
-							<button type="button" className="btn primary sm" onClick={onOpenSettings}>Open Settings</button>
-						</>
-					) : (
-						<>
-							<span>Copix model offline — install Ollama and download gpt-oss:20b, or switch to a free cloud model in Settings.</span>
-							<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
-								<IconPlay width={12} height={12} /> {starting ? 'Checking…' : 'Check Ollama'}
-							</button>
-							<button type="button" className="btn ghost sm" onClick={onOpenSetup}>Set up model</button>
-							<button type="button" className="btn ghost sm" onClick={onOpenSettings}>Use cloud</button>
-						</>
-					)}
+					<span>Ollama offline or qwen2.5:3b not pulled — install Ollama and pull the model.</span>
+					<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
+						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : 'Check Ollama'}
+					</button>
+					<button type="button" className="btn ghost sm" onClick={onOpenSettings}>Model settings</button>
 				</div>
 			)}
 
@@ -728,7 +707,6 @@ export function ChatCenter({
 			<div className="composer">
 				<div className="composer-meta">
 					<button type="button" className="model-chip" title="Change model" onClick={onOpenSettings}>
-						{isCloud && <IconCloud width={12} height={12} />}
 						<span className={`chip-dot ${modelReady ? 'on' : ''}`} />
 						<span className="chip-model">{config.model}</span>
 						<IconChevron width={11} height={11} className="chip-chevron" />

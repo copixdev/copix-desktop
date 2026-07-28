@@ -22,6 +22,8 @@ export interface AgentContext {
 	taskKind?: TaskKind;
 	/** True when this run is already a child subagent — never nest further. */
 	isSubagent?: boolean;
+	/** Fingerprints of tool calls this turn — used to block identical repeats. */
+	recentToolFingerprints?: string[];
 }
 
 interface MultitaskItem {
@@ -325,7 +327,7 @@ const GROQ_TOOL_BLURBS: Record<string, string> = {
 	delete_file: 'Delete a file.',
 	grep: 'Search file contents with ripgrep.',
 	list_dir: 'List files in a directory.',
-	terminal: 'Run a local shell command in the workspace.',
+	terminal: 'Run a shell command for the CURRENT user request only — never re-run unrelated scripts in a loop.',
 	spawn_subagent: 'RARE: spawn child agent only for hard multi-part parallel work — never for greetings or simple tasks.',
 };
 
@@ -420,6 +422,18 @@ async function executeTool(
 ): Promise<ToolResultMeta> {
 	const ws = ctx.workspaceRoot;
 	const tool = normalizeToolName(name);
+	const fingerprint = `${tool}:${JSON.stringify(args)}`;
+	const recent = ctx.recentToolFingerprints ?? (ctx.recentToolFingerprints = []);
+	const sameCount = recent.filter(f => f === fingerprint).length;
+	if (sameCount >= 1 && (tool === 'terminal' || sameCount >= 2)) {
+		return {
+			result: `Refused repeated ${tool} with the same arguments (${sameCount + 1}x). `
+				+ 'Stop looping. Focus on the user\'s latest request — write/edit the files they asked for, then reply.',
+		};
+	}
+	recent.push(fingerprint);
+	if (recent.length > 40) recent.splice(0, recent.length - 40);
+
 	switch (tool) {
 		case 'create_project': {
 			const entries = await copix.listDir(undefined, ws);
@@ -588,9 +602,11 @@ const SUMMARY_USER_PROMPT = `Provide a detailed markdown summary for the user:
 
 Do not call tools. Write clearly for the user.`;
 
-const CONTINUE_USER_PROMPT = `Continue the task from where you left off.
-- Read existing files first — do not recreate work already done.
-- Create or edit any remaining files with tools.
+const CONTINUE_USER_PROMPT = `Continue the task from where you left off — based on the user's LATEST message only.
+- Do not run unrelated existing scripts.
+- Read existing files first if needed — do not recreate work already done for THIS task.
+- Create or edit any remaining files with tools for the requested work.
+- Do not repeat the same terminal command.
 - Do not stop until the work is complete or you are genuinely blocked and need user input.
 - When finished, reply with a clear markdown summary for the user.`;
 
@@ -792,6 +808,7 @@ export async function runAgent(
 		...ctx,
 		userMessage: effectiveUserMessage,
 		taskKind,
+		recentToolFingerprints: [],
 	};
 	const historyTurns = config.provider === 'groq' ? 8 : MAX_HISTORY_TURNS;
 	const historyChars = config.provider === 'groq' ? 4000 : MAX_MESSAGE_CHARS;

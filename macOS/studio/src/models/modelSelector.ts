@@ -20,7 +20,7 @@ export type { TaskKind };
 const INSPECT_RE = /\b(inspect|explain|review|describe|what does|how does|walk me through|understand|overview|summarize|look at|analyze|analyse|codespace|codebase|this folder|this project|tell me about)\b/i;
 const DEBUG_RE = /\b(fix|debug|error|bug|broken|fail(?:s|ed|ing)?|issue|crash|exception|stack trace)\b/i;
 const TERMINAL_RE = /\b(run|install|npm|pnpm|yarn|brew|git|terminal|command|execute|shell|build|test|compile)\b/i;
-const IMPLEMENT_RE = /\b(create|implement|add feature|scaffold|new app|new project|write code|build me|make me|generate|enhance|improve|extend|update|modify|refactor)\b/i;
+const IMPLEMENT_RE = /\b(create|implement|add feature|scaffold|new app|new project|new (python |js |ts )?script|write (a |me )?(new )?|build me|make (me |a |an )?|generate|enhance|improve|extend|update|modify|refactor|simulation|pygame)\b/i;
 const CONTINUATION_RE = /^(yes|yeah|yep|yup|ok|okay|sure|go ahead|continue|proceed|do it|create|yes create|enhance|keep going|finish( it)?|complete( it)?|do that|make it|add that|go on|carry on|please do|do so)\.?!?\s*$/i;
 
 export function isContinuationMessage(userMessage: string): boolean {

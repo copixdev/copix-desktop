@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { formatActivityDisplay, type ChatActivity } from '../chatActivity';
+import { formatActivityDisplay, isVisibleThought, type ChatActivity } from '../chatActivity';
 
 interface Props {
 	activity: ChatActivity;
@@ -31,7 +31,7 @@ export function ChatActivityRow({ activity }: Props) {
 
 	const showDiff = activity.kind === 'edit' && activity.diff?.preview;
 	const canExpand = activity.kind === 'think'
-		? Boolean(activity.thought?.trim())
+		? isVisibleThought(activity)
 		: Boolean(detailText || showDiff);
 
 	return (

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { ChatActivity } from '../chatActivity';
-import { formatActivityDisplay, summarizeWorkflow } from '../chatActivity';
+import { formatActivityDisplay, isVisibleThought, summarizeWorkflow } from '../chatActivity';
 import { ChatActivityList } from './ChatActivityList';
 
 interface Props {
@@ -26,11 +26,9 @@ export function AgentWorkflowCard({ activities, expanded, onToggle, live }: Prop
 		? [activeLabel.verb, activeLabel.target].filter(Boolean).join(' ') + (activeLabel.ellipsis ? '…' : '')
 		: '';
 
-	const thoughtLine = summary.thoughtSec != null
-		? `Thought for ${summary.thoughtSec}s`
-		: live
-			? 'Thinking…'
-			: null;
+	const thoughtLine = isVisibleThought(active) || isVisibleThought(activities.find(a => a.kind === 'think'))
+		? (summary.thoughtSec != null ? `Thought for ${summary.thoughtSec}s` : (live ? 'Rate limited…' : null))
+		: null;
 
 	const statsLine = [
 		summary.reads ? `Explored ${summary.reads} file${summary.reads === 1 ? '' : 's'}` : '',
@@ -90,7 +88,7 @@ export function AgentWorkflowCard({ activities, expanded, onToggle, live }: Prop
 }
 
 export function liveStatusFromActivities(activities: ChatActivity[], fallback = ''): string {
-	const active = [...activities].reverse().find(a => a.phase === 'active');
+	const active = [...activities].reverse().find(a => a.phase === 'active' && (a.kind !== 'think' || isVisibleThought(a)));
 	if (!active) return fallback || 'Planning next moves';
 	const label = formatActivityDisplay(active);
 	return [label.verb, label.target].filter(Boolean).join(' ') + (label.ellipsis ? '…' : '');

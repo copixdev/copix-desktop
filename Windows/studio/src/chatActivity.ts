@@ -40,6 +40,12 @@ export interface WorkflowSummary {
 	subtasks: Array<{ label: string; detail?: string; auto?: boolean }>;
 }
 
+export function isVisibleThought(activity: ChatActivity | undefined): boolean {
+	if (!activity || activity.kind !== 'think') return false;
+	const text = activity.thought?.trim() ?? '';
+	return /rate limit|rate limited|tokens per minute|tpm|try again/i.test(text);
+}
+
 export function summarizeWorkflow(activities: ChatActivity[]): WorkflowSummary {
 	if (!activities.length) {
 		return { durationMs: 0, reads: 0, searches: 0, edits: 0, runs: 0, subtasks: [] };
@@ -47,6 +53,7 @@ export function summarizeWorkflow(activities: ChatActivity[]): WorkflowSummary {
 	const start = Math.min(...activities.map(a => a.startedAt));
 	const end = Math.max(...activities.map(a => a.endedAt ?? Date.now()));
 	const think = activities.find(a => a.kind === 'think');
+	const visibleThink = isVisibleThought(think) ? think : undefined;
 	const thoughtSec = think
 		? Math.max(1, Math.round(((think.endedAt ?? Date.now()) - think.startedAt) / 1000))
 		: undefined;
@@ -71,7 +78,7 @@ export function summarizeWorkflow(activities: ChatActivity[]): WorkflowSummary {
 		searches: activities.filter(a => a.kind === 'search' && a.phase === 'done').length,
 		edits: activities.filter(a => a.kind === 'edit' && a.phase === 'done').length,
 		runs: activities.filter(a => a.kind === 'run' && a.phase === 'done').length,
-		headline: think?.thought?.trim().split('\n').find(l => l.trim())?.trim(),
+		headline: visibleThink?.thought?.trim().split('\n').find(l => l.trim())?.trim(),
 		subtasks: subtasks.slice(-6),
 	};
 }
@@ -172,8 +179,11 @@ export function formatActivityDisplay(activity: ChatActivity): ActivityDisplay {
 				: { verb: 'Searched', target };
 		case 'think': {
 			if (activity.phase === 'active') {
-				return { verb: 'Thinking', ellipsis: true };
+				return isVisibleThought(activity)
+					? { verb: 'Rate limited', ellipsis: true }
+					: { verb: 'Thinking', ellipsis: true };
 			}
+			if (isVisibleThought(activity)) return { verb: 'Rate limited' };
 			const ms = (activity.endedAt ?? Date.now()) - activity.startedAt;
 			const sec = ms / 1000;
 			const label = sec < 10 ? (Math.round(sec * 10) / 10).toFixed(sec < 1 ? 1 : 0) : String(Math.round(sec));

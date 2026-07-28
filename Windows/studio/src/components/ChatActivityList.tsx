@@ -1,4 +1,4 @@
-import type { ChatActivity } from '../chatActivity';
+import { isVisibleThought, type ChatActivity } from '../chatActivity';
 import { ChatActivityRow } from './ChatActivityRow';
 
 interface Props {
@@ -6,11 +6,12 @@ interface Props {
 }
 
 export function ChatActivityList({ activities }: Props) {
-	if (!activities.length) return null;
+	const visible = activities.filter(a => a.kind !== 'think' || isVisibleThought(a));
+	if (!visible.length) return null;
 
 	return (
 		<div className="activity-list" role="list">
-			{activities.map(a => (
+			{visible.map(a => (
 				<ChatActivityRow key={a.id} activity={a} />
 			))}
 		</div>

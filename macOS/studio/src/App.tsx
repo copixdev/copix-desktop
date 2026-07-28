@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { copix } from './api';
-import { ActivityRail } from './components/ActivityRail';
 import { ChatCenter } from './components/ChatCenter';
 import { CommandPalette, type PaletteCommand } from './components/CommandPalette';
 import { EditorArea, type SidePanelMode } from './components/EditorArea';
@@ -15,7 +14,6 @@ import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
 import { normalizeProvider } from './models/modelCatalog';
 import { formatModelChipLabel, preferredModelForTask } from './models/modelSelector';
-import { IconPlus, IconBranch } from './components/Icons';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
 import { subscribeAgentTerminal } from './utils/terminalBridge';
@@ -53,10 +51,6 @@ function AppInner() {
 
 	const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
 	const workspace = activeSession?.workspaceRoot;
-	const openAgentTabs = useMemo(
-		() => sessions.filter(s => !s.archived && !s.parentSessionId).slice(0, 8),
-		[sessions],
-	);
 	const subagentSessions = useMemo(
 		() => sessions.filter(s =>
 			s.parentSessionId && !s.archived && !s.subagentDismissed && s.id !== activeSessionId,
@@ -376,59 +370,27 @@ function AppInner() {
 
 	return (
 		<div className="shell">
-			<header className="titlebar">
-				<img src="./favicon.png" alt="" className="titlebar-logo" draggable={false} />
+			<header className={`titlebar${isMac() ? ' titlebar-mac' : ''}`}>
 				{!isMac() && (
-					<TitleBarMenu
-						onNewAgent={handleNewChat}
-						onOpenFolder={openFolder}
-						onCloneRepo={() => {
-							const url = window.prompt('Repository URL to clone');
-							if (url?.trim()) void cloneRepo(url.trim());
-						}}
-						onToggleEditor={() => setEditorVisible(v => !v)}
-						onOpenPalette={() => setPaletteOpen(true)}
-					/>
+					<>
+						<img src="./favicon.png" alt="" className="titlebar-logo" draggable={false} />
+						<TitleBarMenu
+							onNewAgent={handleNewChat}
+							onOpenFolder={openFolder}
+							onCloneRepo={() => {
+								const url = window.prompt('Repository URL to clone');
+								if (url?.trim()) void cloneRepo(url.trim());
+							}}
+							onToggleEditor={() => setEditorVisible(v => !v)}
+							onOpenPalette={() => setPaletteOpen(true)}
+						/>
+					</>
 				)}
 				<span className="titlebar-drag" />
+				{!isMac() && <span className="titlebar-title">Copix</span>}
 			</header>
-			<div className="agent-tabs-bar">
-				<div className="top-tabs agent-tabs" role="tablist" aria-label="Agents">
-					{openAgentTabs.map(s => {
-						const label = s.workspaceRoot
-							? s.workspaceRoot.replace(/\\/g, '/').split('/').filter(Boolean).pop() || s.title
-							: s.title;
-						return (
-							<button
-								key={s.id}
-								type="button"
-								className={`top-tab agent-tab${s.id === activeSessionId ? ' active' : ''}`}
-								role="tab"
-								aria-selected={s.id === activeSessionId}
-								onClick={() => setActiveSessionId(s.id)}
-							>
-								<IconBranch width={12} height={12} />
-								<span className="agent-tab-title">{label}</span>
-							</button>
-						);
-					})}
-					<button type="button" className="top-tab plus" title="New agent" onClick={handleNewChat}>
-						<IconPlus width={12} height={12} />
-					</button>
-				</div>
-				<span className="titlebar-title">Copix</span>
-			</div>
 
 			<div className="shell-body">
-				<ActivityRail
-					editorVisible={editorVisible}
-					serverOnline={serverOnline}
-					onNewChat={handleNewChat}
-					onToggleEditor={() => setEditorVisible(v => !v)}
-					onOpenPalette={() => setPaletteOpen(true)}
-					onFocusComposer={focusComposer}
-				/>
-
 				<ResizableLayout
 				sidebarWidth={settings.layout.sidebarWidth}
 				editorWidth={settings.layout.editorWidth}

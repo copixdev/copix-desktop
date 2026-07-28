@@ -261,6 +261,15 @@ body { transition: background-color 0.2s ease, color 0.2s ease; }
 body.platform-darwin .titlebar {
 	padding-left: 78px; /* room for macOS traffic lights */
 }
+body.platform-darwin .titlebar-mac {
+	height: 38px;
+	padding-left: 78px;
+	border-bottom: 1px solid rgba(255,255,255,0.05);
+	background: #141416;
+}
+body.platform-darwin .titlebar-mac .titlebar-drag {
+	height: 100%;
+}
 .titlebar-logo {
 	width: 18px;
 	height: 18px;

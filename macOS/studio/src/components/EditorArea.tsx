@@ -222,7 +222,7 @@ export function EditorArea({
 								go(d.id);
 							}}>
 								<d.Icon width={22} height={22} />
-								<span>{d.label}</span>
+								<span>{panelLabel(d.id)}</span>
 							</button>
 						))}
 					</div>

@@ -666,9 +666,11 @@ export function ChatCenter({
 		requestAnimationFrame(() => inputRef.current?.focus());
 	};
 
+	const isStartup = !messages.length && !streaming && !running;
+
 	return (
 
-		<div className="chat-center">
+		<div className={`chat-center${isStartup ? ' is-startup' : ''}`}>
 
 			{!modelReady && (
 				<div className="banner banner-warn">
@@ -730,19 +732,65 @@ export function ChatCenter({
 
 			}}>
 
-				{!messages.length && !streaming && !running && (
+				{isStartup && (
 
 					<div className="chat-empty">
-						<div className="startup-card">
+						<div
+							className="startup-card"
+							onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+							onDrop={e => {
+								e.preventDefault();
+								e.stopPropagation();
+								if (e.dataTransfer.files?.length) addImageFiles(e.dataTransfer.files);
+							}}
+						>
 							<div className="startup-badges">
 								<span className="startup-badge">{branchLabel === 'main' ? 'copix' : branchLabel}</span>
 								<span className="startup-badge">{branchLabel}</span>
 								<span className="startup-badge">{locationLabel}</span>
 							</div>
-							<p className="startup-placeholder">Plan, Build, / for skills, @ for context</p>
+							<textarea
+								ref={inputRef}
+								className="startup-input"
+								placeholder={
+									!modelReady
+										? 'Set up your Copix model to start…'
+										: 'Plan, Build, / for skills, @ for context'
+								}
+								value={input}
+								disabled={running || !workspace || !modelReady}
+								rows={2}
+								onChange={e => {
+									setInput(e.target.value);
+									setCaret(e.target.selectionStart);
+									setCmdDismissed(false);
+									setCmdIndex(0);
+									e.target.style.height = 'auto';
+									e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+								}}
+								onClick={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
+								onKeyUp={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
+								onPaste={handlePaste}
+								onKeyDown={e => {
+									if (e.key === 'Enter' && !e.shiftKey) {
+										e.preventDefault();
+										void send(input);
+									}
+								}}
+							/>
+							{attachments.length > 0 && (
+								<div className="composer-attachments">
+									{attachments.map((src, i) => (
+										<div key={i} className="composer-attachment">
+											<img src={src} alt="" />
+											<button type="button" aria-label="Remove image" onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}>×</button>
+										</div>
+									))}
+								</div>
+							)}
 							<div className="startup-actions">
 								<button type="button" className="startup-chip primary" onClick={() => { void window.copix?.openIdeWindow?.(); }}>
-									<IconExpand width={13} height={13} />
+									<IconExpand width={12} height={12} />
 									Open Editor
 								</button>
 								<button
@@ -750,10 +798,20 @@ export function ChatCenter({
 									className="startup-chip"
 									onClick={() => {
 										setSessionMode('plan');
-										inputRef.current?.focus();
+										requestAnimationFrame(() => inputRef.current?.focus());
 									}}
 								>
 									Plan New Idea
+								</button>
+								<button
+									type="button"
+									className="startup-chip send"
+									disabled={(!input.trim() && !attachments.length) || !modelReady}
+									onClick={() => void send(input)}
+									title="Send"
+								>
+									<IconArrowUp width={12} height={12} />
+									Send
 								</button>
 							</div>
 						</div>
@@ -818,7 +876,7 @@ export function ChatCenter({
 
 
 
-			<div className="composer">
+			{!isStartup && <div className="composer">
 				<div
 					className={`composer-inner cursor-composer${running ? ' disabled' : ''}`}
 					onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
@@ -1027,7 +1085,7 @@ export function ChatCenter({
 						)}
 					</div>
 				</div>
-			</div>
+			</div>}
 			</div>
 
 			<div className="chat-footer">

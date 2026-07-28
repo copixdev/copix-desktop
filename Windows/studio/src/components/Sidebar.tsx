@@ -244,24 +244,24 @@ export function Sidebar({
 		<aside className="sidebar sidebar-v2 sidebar-agents sidebar-cursor">
 			<div className="sidebar-top-actions">
 				<button type="button" className="sidebar-action" onClick={onNewChat}>
-					<IconCompose width={15} height={15} />
+					<IconCompose width={14} height={14} />
 					<span>New Agent</span>
 				</button>
 				<button type="button" className="sidebar-action" onClick={onOpenPalette}>
-					<IconSearch width={15} height={15} />
+					<IconSearch width={14} height={14} />
 					<span>Search</span>
 				</button>
 				<button
 					type="button"
 					className="sidebar-action"
 					onClick={() => setShowClone(v => !v)}
-					title="Clone a repository"
+					title="Automations / clone a repository"
 				>
-					<IconRobot width={15} height={15} />
-					<span>Clone Repo</span>
+					<IconRobot width={14} height={14} />
+					<span>Automations</span>
 				</button>
 				<button type="button" className="sidebar-action" onClick={() => void openCustomize()}>
-					<IconLayout width={15} height={15} />
+					<IconLayout width={14} height={14} />
 					<span>Customize</span>
 				</button>
 			</div>

@@ -694,8 +694,8 @@ export function ChatCenter({
 						<button
 							type="button"
 							className="chat-stage-ide"
-							title="Open editor panel"
-							onClick={() => onReviewFiles?.(collectSessionChanges(messages))}
+							title="Open IDE window"
+							onClick={() => { void window.copix?.openIdeWindow?.(); }}
 						>
 							<span>IDE</span>
 							<IconExpand width={11} height={11} />

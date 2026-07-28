@@ -38,6 +38,7 @@ const api = {
 	getSettings: () => ipcRenderer.invoke('copix:getSettings'),
 	setSettings: (s: unknown) => ipcRenderer.invoke('copix:setSettings', s),
 	openExternal: (url: string) => ipcRenderer.invoke('copix:openExternal', url),
+	openIdeWindow: () => ipcRenderer.invoke('copix:openIdeWindow'),
 	getServerStatus: () => ipcRenderer.invoke('copix:getServerStatus') as Promise<ServerStatus>,
 	startServer: () => ipcRenderer.invoke('copix:startServer') as Promise<{ ok: boolean; message: string }>,
 	pullOllamaModel: (model?: string) => ipcRenderer.invoke('copix:pullOllamaModel', model) as Promise<{ ok: boolean; message: string }>,

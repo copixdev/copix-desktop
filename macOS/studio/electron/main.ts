@@ -589,7 +589,7 @@ function installApplicationMenu(): void {
 	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function createWindow(): void {
+function createAppWindow(): BrowserWindow {
 	const preloadPath = path.join(__dirname, 'preload.mjs');
 	if (!fsSync.existsSync(preloadPath)) {
 		console.error('[copix] Preload script missing:', preloadPath);
@@ -597,7 +597,7 @@ function createWindow(): void {
 
 	const appIcon = loadAppIcon();
 	const isMac = process.platform === 'darwin';
-	mainWindow = new BrowserWindow({
+	const win = new BrowserWindow({
 		width: 1600,
 		height: 940,
 		minWidth: 1100,
@@ -617,23 +617,28 @@ function createWindow(): void {
 		},
 	});
 	if (appIcon && !isMac) {
-		mainWindow.setIcon(appIcon);
+		win.setIcon(appIcon);
 	}
-	if (isMac && appIcon && app.dock) {
+	if (isMac && appIcon && app.dock && !mainWindow) {
 		app.dock.setIcon(appIcon);
 	}
 
-	attachRendererLogging(mainWindow);
-	showLoadingPage(mainWindow);
-	mainWindow.once('ready-to-show', () => mainWindow?.show());
+	attachRendererLogging(win);
+	showLoadingPage(win);
+	win.once('ready-to-show', () => win.show());
 
-	void loadRenderer().catch(err => {
+	void loadRenderer(win).catch(err => {
 		console.error('[copix] loadRenderer failed:', err);
 	});
+	return win;
 }
 
-async function loadRenderer(): Promise<void> {
-	if (!mainWindow) return;
+function createWindow(): void {
+	mainWindow = createAppWindow();
+}
+
+async function loadRenderer(win: BrowserWindow): Promise<void> {
+	if (!win) return;
 
 	const distIndex = path.join(__dirname, '../dist/index.html');
 	const devUrl = process.env.VITE_DEV_SERVER_URL;
@@ -642,8 +647,8 @@ async function loadRenderer(): Promise<void> {
 
 	if (devUrl) {
 		try {
-			await mainWindow.loadURL(devUrl);
-			mainWindow.webContents.openDevTools({ mode: 'detach' });
+			await win.loadURL(devUrl);
+			win.webContents.openDevTools({ mode: 'detach' });
 			console.log('[copix] Loaded dev URL:', devUrl);
 		} catch (err) {
 			console.error('[copix] loadURL failed:', devUrl, err);
@@ -654,7 +659,7 @@ async function loadRenderer(): Promise<void> {
 
 	if (fsSync.existsSync(distIndex)) {
 		try {
-			await mainWindow.loadFile(distIndex);
+			await win.loadFile(distIndex);
 			console.log('[copix] Loaded production build:', distIndex);
 		} catch (err) {
 			console.error('[copix] loadFile failed:', distIndex, err);
@@ -669,7 +674,7 @@ async function loadRenderer(): Promise<void> {
 		'Development: double-click copix-studio.bat or run npm run dev in studio/',
 		'Production: npm run build && npm start',
 	].join('\n');
-	await mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(
+	await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(
 		`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Copix</title></head>`
 		+ `<body style="margin:0;background:#0f0f10;color:#f4f4f5;font:14px/1.5 Segoe UI,sans-serif;padding:32px">`
 		+ `<h1 style="font-size:18px;margin:0 0 12px">Copix Studio</h1>`
@@ -909,6 +914,10 @@ function looksLikeSecretPath(filePath: string): boolean {
 	});
 
 	ipcMain.handle('copix:openExternal', (_e, url: string) => shell.openExternal(url));
+	ipcMain.handle('copix:openIdeWindow', () => {
+		createAppWindow();
+		return { ok: true };
+	});
 
 	ipcMain.handle('copix:getServerStatus', () => fetchServerHealth());
 

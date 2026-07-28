@@ -36,7 +36,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron } from './Icons';
+import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
@@ -113,7 +113,7 @@ function AssistantTurn({
 	onOpenFile?: (path: string) => void;
 	onReviewFiles?: (files: FileChange[]) => void;
 }) {
-	const [workflowOpen, setWorkflowOpen] = useState(false);
+	const [workflowOpen, setWorkflowOpen] = useState(Boolean(live));
 
 	if (!activities?.length && !content) return null;
 
@@ -633,6 +633,20 @@ export function ChatCenter({
 		const leaf = workspace.replace(/\\/g, '/').split('/').filter(Boolean).pop();
 		return leaf || 'main';
 	}, [workspace]);
+	const chatTitle = useMemo(() => {
+		const named = messages.find(m => m.role === 'user' && m.content.trim());
+		if (named?.content) {
+			const t = named.content.trim().replace(/\s+/g, ' ');
+			return t.length > 42 ? `${t.slice(0, 42)}…` : t;
+		}
+		return branchLabel === 'main' ? 'Copix' : branchLabel;
+	}, [messages, branchLabel]);
+
+	const stopRun = () => {
+		abortRef.current?.abort();
+		setRunning(false);
+		setStatus('');
+	};
 
 	return (
 
@@ -652,6 +666,27 @@ export function ChatCenter({
 			)}
 
 			<div className="chat-stage">
+				<header className="chat-stage-header">
+					<div className="chat-stage-title">
+						<span className="chat-stage-name fade-edge">{chatTitle}</span>
+						{providerLabel === 'Cloud' && <IconCloud width={13} height={13} className="chat-stage-cloud" />}
+					</div>
+					<div className="chat-stage-actions">
+						<button
+							type="button"
+							className="chat-stage-ide"
+							title="Open editor panel"
+							onClick={() => onReviewFiles?.(collectSessionChanges(messages))}
+						>
+							<span>IDE</span>
+							<IconExpand width={11} height={11} />
+						</button>
+						<button type="button" className="btn-icon" title="More">
+							<IconMore width={14} height={14} />
+						</button>
+					</div>
+				</header>
+
 				{(sessionDiff.added > 0 || sessionDiff.removed > 0) && (
 					<button
 						type="button"
@@ -830,18 +865,16 @@ export function ChatCenter({
 						>
 							<IconPlus width={16} height={16} />
 						</button>
-						<button
-							type="button"
-							className="composer-auto"
-							title="Model selection (edit ~/Copix/settings.json)"
-						>
-							<span>Auto</span>
-							<IconChevron width={11} height={11} style={{ transform: 'rotate(90deg)' }} />
-						</button>
 						<textarea
 							ref={inputRef}
 							className="composer-input"
-							placeholder={modelReady ? 'Ask Copix… (@ files, / commands, paste images)' : 'Set up your Copix model to start chatting…'}
+							placeholder={
+								!modelReady
+									? 'Set up your Copix model to start chatting…'
+									: messages.length
+										? 'Send follow-up'
+										: 'Ask Copix… (@ files, / commands, paste images)'
+							}
 							value={input}
 							disabled={running || !workspace || !modelReady}
 							rows={1}
@@ -886,18 +919,37 @@ export function ChatCenter({
 								if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
 							}}
 						/>
+						<button
+							type="button"
+							className="composer-auto"
+							title="Model selection (edit ~/Copix/settings.json)"
+						>
+							<span>Auto</span>
+							<IconChevron width={11} height={11} style={{ transform: 'rotate(90deg)' }} />
+						</button>
 						<button type="button" className="composer-mic" title="Voice input (coming soon)" disabled>
 							<IconMic width={16} height={16} />
 						</button>
-						<button
-							type="button"
-							className="composer-send"
-							disabled={running || (!input.trim() && !attachments.length) || !modelReady}
-							onClick={() => send(input)}
-							title="Send"
-						>
-							{running ? <span className="spinner" /> : <IconArrowUp width={16} height={16} />}
-						</button>
+						{running ? (
+							<button
+								type="button"
+								className="composer-send composer-stop"
+								title="Stop"
+								onClick={stopRun}
+							>
+								<IconStop width={12} height={12} />
+							</button>
+						) : (
+							<button
+								type="button"
+								className="composer-send"
+								disabled={(!input.trim() && !attachments.length) || !modelReady}
+								onClick={() => send(input)}
+								title="Send"
+							>
+								<IconArrowUp width={16} height={16} />
+							</button>
+						)}
 					</div>
 				</div>
 			</div>

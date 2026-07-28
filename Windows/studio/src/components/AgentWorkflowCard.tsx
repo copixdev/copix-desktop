@@ -26,24 +26,51 @@ export function AgentWorkflowCard({ activities, expanded, onToggle, live }: Prop
 		? [activeLabel.verb, activeLabel.target].filter(Boolean).join(' ') + (activeLabel.ellipsis ? '…' : '')
 		: '';
 
-	const headerText = live
-		? (expanded && activeText ? activeText : 'Working…')
-		: `Worked for ${formatDuration(summary.durationMs)}`;
+	const thoughtLine = summary.thoughtSec != null
+		? `Thought for ${summary.thoughtSec}s`
+		: live
+			? 'Thinking…'
+			: null;
+
+	const statsLine = [
+		summary.reads ? `Explored ${summary.reads} file${summary.reads === 1 ? '' : 's'}` : '',
+		summary.searches ? `${summary.searches} search${summary.searches === 1 ? '' : 'es'}` : '',
+		summary.runs ? `ran ${summary.runs} command${summary.runs === 1 ? '' : 's'}` : '',
+		summary.edits ? `Editing ${summary.edits} file${summary.edits === 1 ? '' : 's'}` : '',
+	].filter(Boolean).join(', ');
+
+	const addedLines = activities.reduce((n, a) => n + (a.diff?.added ?? 0), 0);
 
 	return (
 		<div className={`workflow-card${expanded ? ' open' : ''}${live ? ' live' : ''}`}>
-			<button type="button" className="workflow-header" onClick={onToggle} aria-expanded={expanded}>
-				<span className="workflow-caret" aria-hidden>{expanded ? '▾' : '▸'}</span>
-				<span className="workflow-title">{headerText}</span>
-			</button>
+			{thoughtLine && (
+				<button type="button" className="workflow-thought-btn" onClick={onToggle} aria-expanded={expanded}>
+					<span className="workflow-thought">{thoughtLine}</span>
+					{!live && (
+						<span className="workflow-worked"> · Worked for {formatDuration(summary.durationMs)}</span>
+					)}
+				</button>
+			)}
+
+			{summary.headline && (
+				<div className="workflow-headline">{summary.headline}</div>
+			)}
+
+			{(statsLine || addedLines > 0) && (
+				<div className="workflow-stats">
+					<span>{statsLine || (summary.edits ? `Editing ${summary.edits} files` : '')}</span>
+					{addedLines > 0 && <span className="workflow-stat-add">+{addedLines}</span>}
+				</div>
+			)}
+
+			{live && (
+				<div className="workflow-live-current" aria-live="polite">
+					{activeText || 'Planning next moves'}
+				</div>
+			)}
+
 			{expanded && (
 				<div className="workflow-body">
-					{summary.thoughtSec != null && (
-						<div className="workflow-thought">Thought for {summary.thoughtSec}s</div>
-					)}
-					{summary.headline && (
-						<div className="workflow-headline">{summary.headline}</div>
-					)}
 					{summary.subtasks.length > 0 && (
 						<ul className="workflow-subtasks">
 							{summary.subtasks.map((task, i) => (
@@ -55,15 +82,6 @@ export function AgentWorkflowCard({ activities, expanded, onToggle, live }: Prop
 							))}
 						</ul>
 					)}
-					{(summary.reads > 0 || summary.searches > 0 || summary.edits > 0) && (
-						<div className="workflow-stats">
-							{[
-								summary.reads ? `Explored ${summary.reads} file${summary.reads === 1 ? '' : 's'}` : '',
-								summary.searches ? `${summary.searches} search${summary.searches === 1 ? '' : 'es'}` : '',
-								summary.edits ? `${summary.edits} edit${summary.edits === 1 ? '' : 's'}` : '',
-							].filter(Boolean).join(', ')}
-						</div>
-					)}
 					<ChatActivityList activities={activities} />
 				</div>
 			)}
@@ -73,7 +91,7 @@ export function AgentWorkflowCard({ activities, expanded, onToggle, live }: Prop
 
 export function liveStatusFromActivities(activities: ChatActivity[], fallback = ''): string {
 	const active = [...activities].reverse().find(a => a.phase === 'active');
-	if (!active) return fallback;
+	if (!active) return fallback || 'Planning next moves';
 	const label = formatActivityDisplay(active);
 	return [label.verb, label.target].filter(Boolean).join(' ') + (label.ellipsis ? '…' : '');
 }

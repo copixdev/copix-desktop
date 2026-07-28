@@ -125,3 +125,66 @@ export function IconExpand(p: P) {
 export function IconCopy(p: P) {
 	return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 012-2h10" strokeLinecap="round" /></svg>;
 }
+
+export function IconSearch(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<circle cx="11" cy="11" r="7" />
+			<path d="M20 20l-3.5-3.5" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+export function IconRobot(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}>
+			<rect x="5" y="8" width="14" height="11" rx="3" />
+			<path d="M12 8V5M9 13h.01M15 13h.01M10 16h4" strokeLinecap="round" />
+			<circle cx="12" cy="4" r="1" fill="currentColor" stroke="none" />
+		</svg>
+	);
+}
+
+export function IconLayout(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}>
+			<rect x="3" y="3" width="18" height="18" rx="2" />
+			<path d="M3 9h18M9 9v12" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+export function IconFilter(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+export function IconSliders(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<path d="M4 7h10M18 7h2M14 7a2 2 0 11-4 0 2 2 0 014 0zM4 17h2M10 17h10M8 17a2 2 0 11-4 0 2 2 0 014 0z" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+export function IconMore(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="currentColor" {...p}>
+			<circle cx="12" cy="5" r="1.6" />
+			<circle cx="12" cy="12" r="1.6" />
+			<circle cx="12" cy="19" r="1.6" />
+		</svg>
+	);
+}
+
+export function IconCompose(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}>
+			<path d="M12 4v10M8 8l4-4 4 4" strokeLinecap="round" strokeLinejoin="round" />
+			<path d="M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4" strokeLinecap="round" />
+		</svg>
+	);
+}

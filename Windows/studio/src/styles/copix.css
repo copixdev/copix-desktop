@@ -2527,9 +2527,199 @@ body.platform-darwin .titlebar {
 	-webkit-mask-image: linear-gradient(to right, #000 72%, transparent 100%);
 }
 
-/* Sidebar v2 (image 6) */
-.sidebar-v2 { padding: 8px 8px 6px; gap: 8px; }
-.sidebar-agents .sidebar-top-actions { margin-bottom: 2px; }
+/* Sidebar v2 — Cursor Agents layout */
+.sidebar-v2 { padding: 10px 8px 8px; gap: 6px; }
+.sidebar-cursor { background: #141416; }
+.sidebar-agents .sidebar-top-actions {
+	margin-bottom: 4px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-top-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.sidebar-action {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	border: none;
+	background: transparent;
+	color: #c8c8d0;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	padding: 7px 10px;
+	border-radius: 8px;
+	cursor: pointer;
+	text-align: left;
+}
+.sidebar-action:hover { background: rgba(255,255,255,0.05); color: #ececf1; }
+.sidebar-action svg { color: #8b8b93; flex-shrink: 0; }
+.sidebar-action:hover svg { color: #c8c8d0; }
+
+.repos-section { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 4px; }
+.repos-head {
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 12px;
+	font-weight: 600;
+	color: #8b8b93;
+	opacity: 1;
+	padding: 8px 8px 6px;
+}
+.section-head-actions { display: flex; gap: 2px; }
+.section-head-actions .btn-icon.active {
+	color: #ececf1;
+	background: rgba(255,255,255,0.06);
+}
+.sidebar-filter {
+	width: 100%;
+	margin: 0 0 8px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	border: 1px solid rgba(255,255,255,0.08);
+	background: #1a1a1c;
+	color: var(--text);
+	font: inherit;
+	font-size: 11.5px;
+	outline: none;
+}
+
+.repo-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
+.repo-group { display: flex; flex-direction: column; gap: 1px; }
+.repo-folder {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	width: 100%;
+	border: none;
+	background: transparent;
+	color: #c8c8d0;
+	text-align: left;
+	padding: 7px 8px;
+	border-radius: 8px;
+	cursor: pointer;
+	font: inherit;
+}
+.repo-folder:hover { background: rgba(255,255,255,0.04); color: #ececf1; }
+.repo-folder.active { background: rgba(255,255,255,0.05); }
+.repo-folder svg { color: #8b8b93; margin-top: 1px; flex-shrink: 0; }
+.repo-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.repo-row-name {
+	font-size: 12.5px;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.repo-row-sub { font-size: 11px; color: #6b6b73; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repo-row-time { font-size: 10.5px; color: #6b6b73; flex-shrink: 0; margin-top: 2px; }
+.repo-empty { display: flex; flex-direction: column; gap: 8px; padding: 8px; align-items: flex-start; }
+.repo-agents {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 0 0 4px 10px;
+}
+.repo-agents-empty {
+	padding: 4px 8px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	align-items: flex-start;
+}
+
+.agent-row.nested {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	border-radius: 8px;
+	padding: 2px 4px 2px 2px;
+	position: relative;
+}
+.agent-row.nested:hover { background: rgba(255,255,255,0.04); }
+.agent-row.nested.active {
+	background: rgba(255,255,255,0.08);
+}
+.agent-row.nested .chat-item {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 4px;
+	border: none;
+	background: transparent;
+	color: #c8c8d0;
+	border-radius: 6px;
+	cursor: pointer;
+	text-align: left;
+	font: inherit;
+	font-size: 12.5px;
+}
+.agent-row.nested .chat-item.active,
+.agent-row.nested.active .chat-item { color: #ececf1; }
+.agent-row.nested .chat-item-title { flex: 1; min-width: 0; }
+.agent-more-wrap { position: relative; flex-shrink: 0; }
+.agent-more-btn {
+	width: 20px;
+	height: 24px;
+	border: none;
+	background: transparent;
+	color: #6b6b73;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	border-radius: 4px;
+	opacity: 0.7;
+}
+.agent-row.nested:hover .agent-more-btn,
+.agent-row.nested.active .agent-more-btn { opacity: 1; color: #8b8b93; }
+.agent-more-btn:hover { background: rgba(255,255,255,0.06); color: #ececf1; }
+.agent-more-menu {
+	position: absolute;
+	top: calc(100% + 2px);
+	left: 0;
+	z-index: 40;
+	min-width: 132px;
+	padding: 4px;
+	border-radius: 8px;
+	border: 1px solid rgba(255,255,255,0.08);
+	background: #1a1a1c;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.agent-more-menu .panel-plus-item.danger { color: #f87171; }
+.agent-row-trailing {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+	padding-right: 2px;
+}
+.agent-trail-btn {
+	opacity: 0;
+	color: #8b8b93;
+}
+.agent-row.nested:hover .agent-trail-btn,
+.agent-row.nested.active .agent-trail-btn { opacity: 1; }
+.agent-cloud {
+	display: inline-flex;
+	color: #6b6b73;
+	opacity: 0.85;
+}
+.agent-row.nested .chat-item-meta {
+	font-size: 10.5px;
+	color: #6b6b73;
+	flex-shrink: 0;
+	min-width: 1.6em;
+	text-align: right;
+}
+
+/* Legacy leftovers kept for other screens */
 .sidebar-action.primary {
 	background: color-mix(in srgb, var(--accent) 18%, var(--bg-2));
 	color: var(--accent-2);
@@ -2592,71 +2782,11 @@ body.platform-darwin .titlebar {
 }
 .agent-list .agent-row:hover .agent-row-actions,
 .agent-list .agent-row.active .agent-row-actions { opacity: 1; }
-
-.sidebar-top-actions {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	padding-bottom: 6px;
-	border-bottom: 1px solid var(--border);
-}
-.sidebar-action {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	width: 100%;
-	border: none;
-	background: transparent;
-	color: var(--text-2);
-	font: inherit;
-	font-size: 12.5px;
-	font-weight: 500;
-	padding: 8px 10px;
-	border-radius: 8px;
-	cursor: pointer;
-	text-align: left;
-}
-.sidebar-action:hover { background: var(--hover); color: var(--text); }
-.section-head-actions { display: flex; gap: 2px; }
-.sidebar-filter {
-	width: 100%;
-	margin: 0 0 6px;
-	padding: 6px 8px;
-	border-radius: 6px;
-	border: 1px solid var(--border);
-	background: var(--bg-1);
-	color: var(--text);
-	font: inherit;
-	font-size: 11.5px;
-	outline: none;
-}
 .chat-item.pill {
 	border-radius: 999px;
 	justify-content: space-between;
 }
 .chat-item-meta { font-size: 10.5px; color: var(--text-3); flex-shrink: 0; }
-.repo-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
-.repo-row {
-	display: flex;
-	align-items: flex-start;
-	gap: 8px;
-	width: 100%;
-	border: none;
-	background: transparent;
-	color: var(--text-2);
-	text-align: left;
-	padding: 8px;
-	border-radius: 8px;
-	cursor: pointer;
-	font: inherit;
-}
-.repo-row:hover { background: var(--hover); color: var(--text); }
-.repo-row.active { background: var(--bg-3); color: var(--text); }
-.repo-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.repo-row-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.repo-row-sub { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.repo-row-time { font-size: 10.5px; color: var(--text-3); flex-shrink: 0; }
-.repo-empty { display: flex; flex-direction: column; gap: 8px; padding: 8px; align-items: flex-start; }
 .sidebar-profile {
 	display: flex;
 	align-items: center;
@@ -2676,7 +2806,22 @@ body.platform-darwin .titlebar {
 .sidebar-profile-text .settings-user-name {
 	max-width: 100%;
 }
-.repo-group { display: flex; flex-direction: column; gap: 1px; }
+.repo-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	width: 100%;
+	border: none;
+	background: transparent;
+	color: var(--text-2);
+	text-align: left;
+	padding: 8px;
+	border-radius: 8px;
+	cursor: pointer;
+	font: inherit;
+}
+.repo-row:hover { background: var(--hover); color: var(--text); }
+.repo-row.active { background: var(--bg-3); color: var(--text); }
 .repo-row-line {
 	display: flex;
 	align-items: center;
@@ -2715,15 +2860,6 @@ body.platform-darwin .titlebar {
 	background: var(--bg-2);
 	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
 }
-.repo-agents {
-	display: flex;
-	flex-direction: column;
-	gap: 1px;
-	padding: 0 0 4px 22px;
-}
-.repo-agents-empty { padding: 4px 8px; }
-.agent-row.nested .chat-item { padding: 5px 6px; gap: 6px; }
-.agent-row.nested .chat-item-meta { margin-left: auto; }
 .sidebar-cwd {
 	font-size: 10px;
 	color: var(--text-3);

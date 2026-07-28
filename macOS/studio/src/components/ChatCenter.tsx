@@ -733,14 +733,12 @@ export function ChatCenter({
 				{!messages.length && !streaming && !running && (
 
 					<div className="chat-empty">
-
-						<div className="startup-badges">
-							<span className="startup-badge">{branchLabel === 'main' ? 'copix' : branchLabel}</span>
-							<span className="startup-badge">{branchLabel}</span>
-							<span className="startup-badge">{locationLabel}</span>
-						</div>
-
 						<div className="startup-card">
+							<div className="startup-badges">
+								<span className="startup-badge">{branchLabel === 'main' ? 'copix' : branchLabel}</span>
+								<span className="startup-badge">{branchLabel}</span>
+								<span className="startup-badge">{locationLabel}</span>
+							</div>
 							<p className="startup-placeholder">Plan, Build, / for skills, @ for context</p>
 							<div className="startup-actions">
 								<button type="button" className="startup-chip primary" onClick={() => { void window.copix?.openIdeWindow?.(); }}>
@@ -758,23 +756,6 @@ export function ChatCenter({
 									Plan New Idea
 								</button>
 							</div>
-						</div>
-
-						<div className="suggestion-grid">
-							{SUGGESTIONS.slice(0, 2).map(s => (
-								<button
-									key={s.title}
-									type="button"
-									className="suggestion-card"
-									onClick={() => {
-										setInput(s.prompt);
-										document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus();
-									}}
-								>
-									<span className="suggestion-title">{s.title}</span>
-									<span className="suggestion-text">{s.prompt}</span>
-								</button>
-							))}
 						</div>
 
 						{demoActivities.length > 0 && (

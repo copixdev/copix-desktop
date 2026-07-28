@@ -1014,9 +1014,9 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 .chat-empty {
 	margin: auto;
 	text-align: center;
-	max-width: 760px;
+	max-width: 540px;
 	position: relative;
-	padding: 32px 24px 24px;
+	padding: 24px 16px 16px;
 }
 .empty-glow { display: none; }
 .startup-badges {
@@ -1024,7 +1024,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	align-items: center;
 	gap: 10px;
 	flex-wrap: wrap;
-	margin-bottom: 18px;
+	margin-bottom: 14px;
 }
 .startup-badge {
 	display: inline-flex;
@@ -1034,9 +1034,9 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	font-size: 13px;
 }
 .startup-card {
-	max-width: 760px;
-	margin: 0 auto 16px;
-	padding: 18px 18px 14px;
+	max-width: 540px;
+	margin: 0 auto;
+	padding: 18px 18px 16px;
 	border: 1px solid rgba(255,255,255,0.08);
 	border-radius: 18px;
 	background: #222225;
@@ -1075,14 +1075,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 .chat-empty h2,
 .chat-empty > p { display: none; }
 
-.suggestion-grid {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 10px;
-	margin-top: 0;
-	position: relative;
-	text-align: left;
-}
+.suggestion-grid { display: none; }
 .suggestion-card {
 	display: flex;
 	flex-direction: column;

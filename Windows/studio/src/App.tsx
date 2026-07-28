@@ -12,7 +12,7 @@ import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData
 import { DEFAULT_SETTINGS, AppSettings } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
-import { normalizeProvider } from './models/modelCatalog';
+import { normalizeProvider, sanitizeGroqModelId } from './models/modelCatalog';
 import { formatModelChipLabel, preferredModelForTask } from './models/modelSelector';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
@@ -424,6 +424,7 @@ function AppInner() {
 					<ChatCenter
 						sessionId={activeSessionId}
 						workspace={workspace}
+						workspaceEnv={workspaceEnv}
 						settings={settings}
 						tree={tree}
 						messages={activeSession?.messages ?? []}

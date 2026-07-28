@@ -424,6 +424,7 @@ function AppInner() {
 					<ChatCenter
 						sessionId={activeSessionId}
 						workspace={workspace}
+						workspaceEnv={workspaceEnv}
 						settings={settings}
 						tree={tree}
 						messages={activeSession?.messages ?? []}

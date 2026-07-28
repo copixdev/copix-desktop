@@ -38,7 +38,7 @@ import { useToast } from './Toast';
 
 import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconFile, IconBrain, IconCommand, IconLink } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
-import type { AgentMode } from '../models/agentModes';
+import type { AgentMode, WorkspaceEnvironment } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
 import { UserPromptPill } from './UserPromptPill';
 import { FilesChangedCard, type FileChange } from './FilesChangedCard';
@@ -58,6 +58,7 @@ interface Props {
 	sessionId: string;
 
 	workspace?: string;
+	workspaceEnv?: WorkspaceEnvironment;
 
 	settings: AppSettings;
 
@@ -174,7 +175,7 @@ function AssistantTurn({
 
 export function ChatCenter({
 
-	sessionId, workspace, settings, messages, onMessagesChange, onWorkspaceChange,
+	sessionId, workspace, workspaceEnv, settings, messages, onMessagesChange, onWorkspaceChange,
 	tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
 
 }: Props) {
@@ -638,7 +639,7 @@ export function ChatCenter({
 		() => sumChanges(collectSessionChanges(messages)),
 		[messages],
 	);
-	const providerLabel = normalizeProvider(settings.model.provider) === 'groq' ? 'Cloud' : 'Local';
+	const locationLabel = workspaceEnv === 'desktop' ? 'Local' : 'Cloud';
 	const branchLabel = useMemo(() => {
 		if (!workspace) return 'main';
 		const leaf = workspace.replace(/\\/g, '/').split('/').filter(Boolean).pop();
@@ -686,7 +687,7 @@ export function ChatCenter({
 				<header className="chat-stage-header">
 					<div className="chat-stage-title">
 						<span className="chat-stage-name fade-edge">{chatTitle}</span>
-						{providerLabel === 'Cloud' && <IconCloud width={13} height={13} className="chat-stage-cloud" />}
+						{locationLabel === 'Cloud' && <IconCloud width={13} height={13} className="chat-stage-cloud" />}
 					</div>
 					<div className="chat-stage-actions">
 						<button
@@ -1033,9 +1034,9 @@ export function ChatCenter({
 					<IconBranch width={13} height={13} />
 					<span>{branchLabel}</span>
 				</span>
-				<span className="chat-footer-item" title={modelChipLabel}>
+				<span className="chat-footer-item" title={workspaceEnv === 'desktop' ? 'Local workspace' : 'Cloud / GitHub workspace'}>
 					<IconCloud width={13} height={13} />
-					<span>{providerLabel}</span>
+					<span>{locationLabel}</span>
 					<IconChevron width={10} height={10} style={{ transform: 'rotate(90deg)' }} />
 				</span>
 				<span className="chat-footer-spacer" />

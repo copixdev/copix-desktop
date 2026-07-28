@@ -58,6 +58,9 @@ export const GROQ_TASK_MODEL_PREFERENCE: Record<TaskKind, string> = {
 
 export const GROQ_FALLBACK_MODEL = 'llama-3.1-8b-instant';
 
+/** Vision / image understanding (up to 5 images per request). */
+export const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
 /** Ordered fallbacks when preferred Groq model returns 404 / rate-limit / TPM errors. */
 export const GROQ_MODEL_FALLBACKS = [
 	'llama-3.3-70b-versatile',

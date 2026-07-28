@@ -366,13 +366,27 @@ function toolsForTask(taskKind: TaskKind, provider?: string, userMessage?: strin
 	return provider === 'groq' ? compactTools(base) : base;
 }
 
+type ContentPart =
+	| { type: 'text'; text: string }
+	| { type: 'image_url'; image_url: { url: string } };
+
 type ChatMsg = {
 	role: 'system' | 'user' | 'assistant' | 'tool';
-	content: string;
+	content: string | ContentPart[];
 	tool_call_id?: string;
 	name?: string;
 	tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
 };
+
+function userContentWithImages(text: string, images?: string[]): string | ContentPart[] {
+	const urls = (images ?? []).filter(Boolean).slice(0, 5);
+	if (!urls.length) return text;
+	const parts: ContentPart[] = [
+		{ type: 'text', text: text || 'Please look at the attached image(s) and help with my request.' },
+		...urls.map(url => ({ type: 'image_url' as const, image_url: { url } })),
+	];
+	return parts;
+}
 
 export type ToolResultMeta = {
 	result: string;
@@ -789,6 +803,8 @@ function historyToMessages(
 export interface AgentRunOptions {
 	mode?: AgentMode;
 	taskKind?: TaskKind;
+	/** Data-URL images pasted/attached to this user turn (vision). */
+	images?: string[];
 }
 
 export async function runAgent(
@@ -803,6 +819,7 @@ export async function runAgent(
 	const mode = options.mode ?? 'code';
 	const taskKind = options.taskKind ?? inferTaskKind(userMessage, mode);
 	const effectiveUserMessage = augmentUserMessage(userMessage, priorMessages);
+	const images = (options.images ?? []).slice(0, 5);
 	const activeTools = toolsForTask(taskKind, config.provider, effectiveUserMessage);
 	const runCtx: AgentContext = {
 		...ctx,
@@ -824,7 +841,7 @@ export async function runAgent(
 			}),
 		},
 		...historyToMessages(priorMessages, historyTurns, historyChars),
-		{ role: 'user', content: effectiveUserMessage },
+		{ role: 'user', content: userContentWithImages(effectiveUserMessage, images) },
 	];
 
 	const maxRounds = MAX_AGENT_ROUNDS;

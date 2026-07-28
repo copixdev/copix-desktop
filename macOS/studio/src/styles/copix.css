@@ -1786,18 +1786,41 @@ body.platform-darwin .titlebar {
 }
 .composer-inner {
 	display: flex;
-	align-items: flex-end;
-	gap: 8px;
+	flex-direction: column;
+	gap: 6px;
 	max-width: 800px;
 	margin: 0 auto;
-	background: var(--bg-1);
-	border: 1px solid var(--border-strong);
+	padding: 8px 10px 8px 14px;
 	border-radius: 12px;
-	padding: 5px 5px 5px 16px;
+	border: 1px solid var(--border-strong);
+	background: var(--bg-1);
 	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 	position: relative;
 }
+.composer-row {
+	display: flex;
+	align-items: flex-end;
+	gap: 8px;
+}
+.composer-row .composer-input {
+	flex: 1;
+	min-width: 0;
+}
+.composer-attach {
+	flex-shrink: 0;
+	width: 34px;
+	height: 34px;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	background: var(--bg-2);
+	color: var(--text-2);
+	display: grid;
+	place-items: center;
+	cursor: pointer;
+}
+.composer-attach:hover:not(:disabled) { color: var(--text); background: var(--hover); }
+.composer-attach:disabled { opacity: 0.35; cursor: default; }
 .composer-command-menu {
 	position: absolute;
 	left: 0;
@@ -2477,6 +2500,70 @@ body.platform-darwin .titlebar {
 
 /* Sidebar v2 (image 6) */
 .sidebar-v2 { padding: 8px 8px 6px; gap: 8px; }
+.sidebar-agents .sidebar-top-actions { margin-bottom: 2px; }
+.sidebar-action.primary {
+	background: color-mix(in srgb, var(--accent) 18%, var(--bg-2));
+	color: var(--accent-2);
+	border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.sidebar-action.primary:hover {
+	background: color-mix(in srgb, var(--accent) 28%, var(--bg-2));
+}
+.sidebar-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0 2px;
+}
+.sidebar-toolbar .sidebar-filter { flex: 1; margin: 0; }
+.section-count {
+	margin-left: auto;
+	font-size: 10.5px;
+	color: var(--text-3);
+	font-weight: 500;
+}
+.agent-list { gap: 2px; }
+.agent-list .agent-row {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	border-radius: 8px;
+}
+.agent-list .agent-row.active {
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.agent-list .chat-item {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 7px 8px;
+	border: none;
+	background: transparent;
+	color: var(--text-2);
+	border-radius: 8px;
+	cursor: pointer;
+	text-align: left;
+}
+.agent-list .chat-item:hover { background: var(--hover); color: var(--text); }
+.agent-list .chat-item.active { color: var(--text); }
+.agent-child-count {
+	font-size: 10px;
+	padding: 0 5px;
+	border-radius: 999px;
+	background: var(--bg-3);
+	color: var(--text-3);
+}
+.agent-list .agent-row-actions {
+	opacity: 0;
+	display: flex;
+	gap: 1px;
+	padding-right: 4px;
+}
+.agent-list .agent-row:hover .agent-row-actions,
+.agent-list .agent-row.active .agent-row-actions { opacity: 1; }
+
 .sidebar-top-actions {
 	display: flex;
 	flex-direction: column;

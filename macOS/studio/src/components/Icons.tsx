@@ -36,6 +36,16 @@ export function IconSettings(p: P) {
 	);
 }
 
+export function IconImage(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}>
+			<rect x="3" y="5" width="18" height="14" rx="2" />
+			<path d="M3 15l4.5-4.5a2 2 0 012.8 0L16 16M14 13l1.5-1.5a2 2 0 012.8 0L21 15" strokeLinecap="round" strokeLinejoin="round" />
+			<circle cx="8.5" cy="9" r="1.2" fill="currentColor" stroke="none" />
+		</svg>
+	);
+}
+
 export function IconSend(p: P) {
 	return <svg viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M3 11l18-7-7 18-2-8-9-1z" /></svg>;
 }

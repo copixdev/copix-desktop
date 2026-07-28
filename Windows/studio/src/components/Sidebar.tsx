@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ChatSession } from '../hooks/chatSessions';
 import type { WorkspaceEnvironment } from '../models/agentModes';
 import {
-	IconPlus, IconFolder, IconCommand, IconSparkle, IconChevron, IconChat,
+	IconPlus, IconFolder, IconCommand, IconSparkle, IconChat,
 } from './Icons';
 
 interface Props {
@@ -33,9 +33,14 @@ function folderName(p: string): string {
 	return parts[parts.length - 1] || p;
 }
 
-function agentLabel(s: ChatSession): string {
-	if (s.workspaceRoot) return folderName(s.workspaceRoot);
-	return s.title;
+function agentTitle(s: ChatSession): string {
+	const title = s.title?.trim();
+	if (title && title !== 'New agent' && !/^agent-\d+/i.test(title)) return title;
+	if (s.workspaceRoot) {
+		const name = folderName(s.workspaceRoot);
+		if (name && !/^agent-\d+/i.test(name)) return name;
+	}
+	return title || 'New agent';
 }
 
 function relativeTime(ts: number): string {
@@ -53,72 +58,61 @@ export function Sidebar({
 	onSelectSession, onNewChat, onOpenFolder, onCloneRepo,
 	onOpenPalette, onTogglePinSession, onDeleteSession,
 }: Props) {
-	const [cloneInput, setCloneInput] = useState('');
+	const [filter, setFilter] = useState('');
 	const [showClone, setShowClone] = useState(false);
-	const [repoFilter, setRepoFilter] = useState('');
-	const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-	const [repoMenu, setRepoMenu] = useState<string | null>(null);
-	const menuRef = useRef<HTMLDivElement>(null);
+	const [cloneInput, setCloneInput] = useState('');
 	const filterRef = useRef<HTMLInputElement>(null);
 
-	useEffect(() => {
-		if (!repoMenu) return;
-		const onDoc = (e: MouseEvent) => {
-			if (!menuRef.current?.contains(e.target as Node)) setRepoMenu(null);
-		};
-		document.addEventListener('mousedown', onDoc);
-		return () => document.removeEventListener('mousedown', onDoc);
-	}, [repoMenu]);
-
-	const pinned = useMemo(
-		() => sessions.filter(s => s.pinned && !s.archived),
-		[sessions],
-	);
-
-	const repos = useMemo(() => {
-		const map = new Map<string, {
-			path: string;
-			updatedAt: number;
-			sessionId: string;
-			agents: ChatSession[];
-		}>();
-		for (const s of sessions) {
-			if (!s.workspaceRoot || s.archived) continue;
-			const prev = map.get(s.workspaceRoot);
-			if (!prev) {
-				map.set(s.workspaceRoot, {
-					path: s.workspaceRoot,
-					updatedAt: s.createdAt,
-					sessionId: s.id,
-					agents: [s],
-				});
-			} else {
-				prev.agents.push(s);
-				if (s.createdAt > prev.updatedAt) {
-					prev.updatedAt = s.createdAt;
-					prev.sessionId = s.id;
-				}
-			}
-		}
-		if (workspace && !map.has(workspace)) {
-			map.set(workspace, {
-				path: workspace,
-				updatedAt: Date.now(),
-				sessionId: activeId,
-				agents: [],
+	const agents = useMemo(() => {
+		const q = filter.trim().toLowerCase();
+		return sessions
+			.filter(s => !s.archived && !s.parentSessionId)
+			.filter(s => {
+				if (!q) return true;
+				const hay = `${agentTitle(s)} ${s.workspaceRoot ?? ''}`.toLowerCase();
+				return hay.includes(q);
+			})
+			.sort((a, b) => {
+				if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+				const aLast = a.messages[a.messages.length - 1]?.timestamp ?? a.createdAt;
+				const bLast = b.messages[b.messages.length - 1]?.timestamp ?? b.createdAt;
+				return bLast - aLast;
 			});
-		}
-		return [...map.values()]
-			.filter(r => !repoFilter || folderName(r.path).toLowerCase().includes(repoFilter.toLowerCase()))
-			.sort((a, b) => b.updatedAt - a.updatedAt);
-	}, [sessions, workspace, activeId, repoFilter]);
+	}, [sessions, filter]);
 
-	const isExpanded = (path: string) => expanded[path] ?? path === workspace;
+	const pinned = agents.filter(s => s.pinned);
+	const recent = agents.filter(s => !s.pinned);
+
+	const renderAgent = (s: ChatSession) => {
+		const last = s.messages[s.messages.length - 1]?.timestamp ?? s.createdAt;
+		const childCount = sessions.filter(c => c.parentSessionId === s.id && !c.archived).length;
+		return (
+			<div key={s.id} className={`agent-row${s.id === activeId ? ' active' : ''}`}>
+				<button
+					type="button"
+					className={`chat-item${s.id === activeId ? ' active' : ''}`}
+					onClick={() => onSelectSession(s.id)}
+					title={s.workspaceRoot || agentTitle(s)}
+				>
+					{s.pinned ? <span className="agent-pin">★</span> : <IconChat width={13} height={13} />}
+					<span className="chat-item-title fade-edge">{agentTitle(s)}</span>
+					{childCount > 0 && <span className="agent-child-count">{childCount}</span>}
+					<span className="chat-item-meta">{relativeTime(last)}</span>
+				</button>
+				<div className="agent-row-actions">
+					<button type="button" className="btn-icon" title={s.pinned ? 'Unpin' : 'Pin'} onClick={() => onTogglePinSession(s.id)}>
+						{s.pinned ? '★' : '☆'}
+					</button>
+					<button type="button" className="btn-icon" title="Delete" onClick={() => onDeleteSession(s.id)}>✕</button>
+				</div>
+			</div>
+		);
+	};
 
 	return (
-		<aside className="sidebar sidebar-v2">
+		<aside className="sidebar sidebar-v2 sidebar-agents">
 			<div className="sidebar-top-actions">
-				<button type="button" className="sidebar-action" onClick={onNewChat}>
+				<button type="button" className="sidebar-action primary" onClick={onNewChat}>
 					<IconSparkle width={15} height={15} />
 					<span>New Agent</span>
 				</button>
@@ -128,158 +122,42 @@ export function Sidebar({
 				</button>
 			</div>
 
-			<section className="sidebar-section">
-				<div className="section-head"><span>Pinned</span></div>
-				<div className="chat-list">
-					{pinned.map(s => (
-						<button
-							key={s.id}
-							type="button"
-							className={`chat-item pill${s.id === activeId ? ' active' : ''}`}
-							onClick={() => onSelectSession(s.id)}
-						>
-							<span className="chat-item-title fade-edge">{agentLabel(s)}</span>
-							<span className="chat-item-meta">{relativeTime(s.createdAt)}</span>
-						</button>
-					))}
-					{!pinned.length && <p className="muted-xs">Pin an agent to keep it here.</p>}
-				</div>
-			</section>
-
-			<section className="sidebar-section grow">
-				<div className="section-head">
-					<span>Repositories</span>
-					<div className="section-head-actions">
-						<button type="button" className="btn-icon" title="Filter" onClick={() => filterRef.current?.focus()}>
-							<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-								<path d="M2 4h12M4 8h8M6 12h4" strokeLinecap="round" />
-							</svg>
-						</button>
-						<button type="button" className="btn-icon" title="Open folder" onClick={onOpenFolder}>
-							<IconFolder width={13} height={13} />
-						</button>
-						<button type="button" className="btn-icon" title="New agent" onClick={onNewChat}>
-							<IconPlus width={13} height={13} />
-						</button>
-					</div>
-				</div>
+			<div className="sidebar-toolbar">
 				<input
 					ref={filterRef}
 					className="sidebar-filter"
-					placeholder="Filter repos"
-					value={repoFilter}
-					onChange={e => setRepoFilter(e.target.value)}
+					placeholder="Search agents"
+					value={filter}
+					onChange={e => setFilter(e.target.value)}
 				/>
-				<div className="repo-list">
-					{repos.map(r => {
-						const open = isExpanded(r.path);
-						const latest = r.agents[0];
-						return (
-							<div key={r.path} className={`repo-group${r.path === workspace ? ' active' : ''}`}>
-								<div className="repo-row-line">
-									<button
-										type="button"
-										className="repo-chevron"
-										onClick={() => setExpanded(prev => ({ ...prev, [r.path]: !open }))}
-										aria-label={open ? 'Collapse' : 'Expand'}
-									>
-										<IconChevron
-											width={11}
-											height={11}
-											style={{ transform: open ? 'rotate(90deg)' : 'none' }}
-										/>
-									</button>
-									<button
-										type="button"
-										className={`repo-row${r.path === workspace ? ' active' : ''}`}
-										onClick={() => onSelectSession(r.sessionId)}
-										title={r.path}
-									>
-										<IconFolder width={14} height={14} />
-										<div className="repo-row-text">
-											<span className="repo-row-name fade-edge">{folderName(r.path)}</span>
-											{!open && (
-												<span className="repo-row-sub">
-													{latest ? agentLabel(latest) : 'No agents yet.'}
-												</span>
-											)}
-										</div>
-										<span className="repo-row-time">{relativeTime(r.updatedAt)}</span>
-									</button>
-									<div className="repo-plus-wrap" ref={repoMenu === r.path ? menuRef : undefined}>
-										<button
-											type="button"
-											className="btn-icon repo-plus"
-											title="Add"
-											onClick={e => {
-												e.stopPropagation();
-												setRepoMenu(m => m === r.path ? null : r.path);
-											}}
-										>
-											<IconPlus width={12} height={12} />
-										</button>
-										{repoMenu === r.path && (
-											<div className="repo-plus-menu fade-in">
-												<button
-													type="button"
-													className="panel-plus-item"
-													onClick={() => {
-														setRepoMenu(null);
-														onNewChat();
-													}}
-												>
-													<IconSparkle width={13} height={13} />
-													New agent
-												</button>
-												<button
-													type="button"
-													className="panel-plus-item"
-													onClick={() => {
-														setRepoMenu(null);
-														onOpenFolder();
-													}}
-												>
-													<IconFolder width={13} height={13} />
-													Open folder
-												</button>
-											</div>
-										)}
-									</div>
-								</div>
-								{open && (
-									<div className="repo-agents">
-										{r.agents.length === 0 && (
-											<p className="muted-xs repo-agents-empty">No agents yet.</p>
-										)}
-										{r.agents.map(s => (
-											<div key={s.id} className={`agent-row nested${s.id === activeId ? ' active' : ''}`}>
-												<button
-													type="button"
-													className={`chat-item${s.id === activeId ? ' active' : ''}`}
-													onClick={() => onSelectSession(s.id)}
-												>
-													{s.pinned ? <span className="agent-pin">★</span> : <IconChat width={12} height={12} />}
-													<span className="chat-item-title fade-edge">{agentLabel(s)}</span>
-													<span className="chat-item-meta">{relativeTime(s.createdAt)}</span>
-												</button>
-												<div className="agent-row-actions">
-													<button type="button" className="btn-icon" title={s.pinned ? 'Unpin' : 'Pin'} onClick={() => onTogglePinSession(s.id)}>
-														{s.pinned ? '★' : '☆'}
-													</button>
-													<button type="button" className="btn-icon" title="Delete" onClick={() => onDeleteSession(s.id)}>✕</button>
-												</div>
-											</div>
-										))}
-									</div>
-								)}
-							</div>
-						);
-					})}
-					{!repos.length && (
+				<button type="button" className="btn-icon" title="Open folder" onClick={onOpenFolder}>
+					<IconFolder width={13} height={13} />
+				</button>
+				<button type="button" className="btn-icon" title="New agent" onClick={onNewChat}>
+					<IconPlus width={13} height={13} />
+				</button>
+			</div>
+
+			{pinned.length > 0 && (
+				<section className="sidebar-section">
+					<div className="section-head"><span>Pinned</span></div>
+					<div className="chat-list agent-list">{pinned.map(renderAgent)}</div>
+				</section>
+			)}
+
+			<section className="sidebar-section grow">
+				<div className="section-head">
+					<span>Agents</span>
+					<span className="section-count">{agents.length}</span>
+				</div>
+				<div className="chat-list agent-list">
+					{recent.map(renderAgent)}
+					{!agents.length && (
 						<div className="repo-empty">
-							<p className="muted-xs">No repositories yet</p>
-							<button type="button" className="btn sm" onClick={onOpenFolder}>Open folder</button>
-							<button type="button" className="btn ghost sm" onClick={() => setShowClone(v => !v)}>Clone</button>
+							<p className="muted-xs">No agents yet</p>
+							<button type="button" className="btn sm" onClick={onNewChat}>New Agent</button>
+							<button type="button" className="btn ghost sm" onClick={onOpenFolder}>Open folder</button>
+							<button type="button" className="btn ghost sm" onClick={() => setShowClone(v => !v)}>Clone repo</button>
 						</div>
 					)}
 				</div>
@@ -301,7 +179,10 @@ export function Sidebar({
 					</div>
 				)}
 			</section>
-			{workspace && <p className="sidebar-cwd" title={workspace}>{shortPath(workspace)}</p>}
+
+			{workspace && (
+				<p className="sidebar-cwd" title={workspace}>{shortPath(workspace)}</p>
+			)}
 		</aside>
 	);
 }

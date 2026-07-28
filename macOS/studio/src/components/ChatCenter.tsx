@@ -36,7 +36,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconSend, IconPlay, IconCopy } from './Icons';
+import { IconSend, IconPlay, IconCopy, IconImage } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
@@ -375,13 +375,11 @@ export function ChatCenter({
 			timestamp: Date.now(),
 		};
 
-		const agentMsg = images.length
-			? `${msg}${msg ? '\n\n' : ''}[User attached ${images.length} image${images.length === 1 ? '' : 's'}]`
-			: msg;
+		const agentMsg = msg;
 
 		const nextMessages = [...messages, userMsg];
 
-		onMessagesChange(nextMessages, titleFromMessage(msg));
+		onMessagesChange(nextMessages, titleFromMessage(msg || 'Image'));
 
 
 
@@ -399,7 +397,13 @@ export function ChatCenter({
 
 		try {
 
-			const runConfig = resolveModelConfig(settings.model, agentMode, server.models ?? [], msg);
+			const runConfig = resolveModelConfig(
+				settings.model,
+				agentMode,
+				server.models ?? [],
+				msg,
+				{ hasImages: images.length > 0 },
+			);
 			const taskKind = inferTaskKind(msg, agentMode);
 
 			await runAgent(
@@ -484,7 +488,7 @@ export function ChatCenter({
 
 				},
 
-				{ mode: agentMode, taskKind },
+				{ mode: agentMode, taskKind, images: images.length ? [...images] : undefined },
 
 			);
 
@@ -577,21 +581,38 @@ export function ChatCenter({
 	const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
 		const items = e.clipboardData?.items;
 		if (!items) return;
-		for (const item of items) {
-			if (!item.type.startsWith('image/')) continue;
-			e.preventDefault();
+		const imageItems = [...items].filter(item => item.type.startsWith('image/'));
+		if (!imageItems.length) return;
+		e.preventDefault();
+		for (const item of imageItems) {
 			const file = item.getAsFile();
-			if (!file) return;
+			if (!file) continue;
 			const reader = new FileReader();
 			reader.onload = () => {
 				const dataUrl = reader.result;
 				if (typeof dataUrl === 'string') {
-					setAttachments(prev => [...prev, dataUrl]);
+					setAttachments(prev => prev.length >= 5 ? prev : [...prev, dataUrl]);
 				}
 			};
 			reader.readAsDataURL(file);
 		}
 	};
+
+	const addImageFiles = (files: FileList | File[]) => {
+		const list = [...files].filter(f => f.type.startsWith('image/')).slice(0, 5);
+		for (const file of list) {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const dataUrl = reader.result;
+				if (typeof dataUrl === 'string') {
+					setAttachments(prev => prev.length >= 5 ? prev : [...prev, dataUrl]);
+				}
+			};
+			reader.readAsDataURL(file);
+		}
+	};
+
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	// Must be defined before JSX — missing this caused ReferenceError on launch.
 	const showLiveTurn =
 		running &&
@@ -729,10 +750,29 @@ export function ChatCenter({
 					<span className="composer-hint">
 						{workspace ? shortPath(workspace) : 'No workspace'}
 					</span>
-					<span className="composer-keys">Enter to send · Shift+Enter for newline</span>
+					<span className="composer-keys">Paste image · Enter to send · Shift+Enter newline</span>
 				</div>
 
-				<div className={`composer-inner${running ? ' disabled' : ''}`}>
+				<div
+					className={`composer-inner${running ? ' disabled' : ''}`}
+					onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+					onDrop={e => {
+						e.preventDefault();
+						e.stopPropagation();
+						if (e.dataTransfer.files?.length) addImageFiles(e.dataTransfer.files);
+					}}
+				>
+					<input
+						ref={fileInputRef}
+						type="file"
+						accept="image/*"
+						multiple
+						hidden
+						onChange={e => {
+							if (e.target.files?.length) addImageFiles(e.target.files);
+							e.target.value = '';
+						}}
+					/>
 					{attachments.length > 0 && (
 						<div className="composer-attachments">
 							{attachments.map((src, i) => (
@@ -768,13 +808,14 @@ export function ChatCenter({
 						/>
 					)}
 
+					<div className="composer-row">
 					<textarea
 
 						ref={inputRef}
 
 						className="composer-input"
 
-						placeholder={modelReady ? 'Ask Copix… (@ files, / commands)' : 'Set up your Copix model to start chatting…'}
+						placeholder={modelReady ? 'Ask Copix… (@ files, / commands, paste images)' : 'Set up your Copix model to start chatting…'}
 
 						value={input}
 
@@ -837,6 +878,16 @@ export function ChatCenter({
 					/>
 
 					<button
+						type="button"
+						className="composer-attach"
+						title="Attach image (or paste / drop)"
+						disabled={running || attachments.length >= 5}
+						onClick={() => fileInputRef.current?.click()}
+					>
+						<IconImage width={16} height={16} />
+					</button>
+
+					<button
 
 						type="button"
 
@@ -847,11 +898,9 @@ export function ChatCenter({
 						onClick={() => send(input)}
 
 					>
-
-						<IconSend width={18} height={18} />
-
+						{running ? <span className="spinner" /> : <IconSend width={14} height={14} />}
 					</button>
-
+					</div>
 				</div>
 
 				{liveStatus && (

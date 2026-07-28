@@ -4,11 +4,12 @@ export {
 	COPIX_MODEL_IDS,
 	GROQ_BASE_URL,
 	GROQ_FALLBACK_MODEL,
+	GROQ_VISION_MODEL,
 } from './modelCatalog.js';
 export type { ModelProvider } from '../types.js';
 
 import type { AgentMode } from './agentModes.js';
-import { FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, normalizeProvider } from './modelCatalog.js';
+import { FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, GROQ_VISION_MODEL, normalizeProvider } from './modelCatalog.js';
 import type { ModelProvider } from '../types.js';
 import { selectModelForTask } from './modelSelector.js';
 import type { ModelSettings } from '../types.js';
@@ -67,8 +68,13 @@ export function resolveModelConfig(
 	agentMode: AgentMode,
 	installed: string[] = [],
 	userMessage?: string,
+	opts?: { hasImages?: boolean },
 ): ModelConfig {
-	const modelId = selectModelForTask(agentMode, model, installed, userMessage);
+	let modelId = selectModelForTask(agentMode, model, installed, userMessage);
+	const provider = normalizeProvider(model.provider);
+	if (opts?.hasImages && provider === 'groq') {
+		modelId = GROQ_VISION_MODEL;
+	}
 	return settingsToConfig(model, modelId);
 }
 

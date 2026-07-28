@@ -75,6 +75,7 @@ interface Props {
 	onReviewFiles?: (files: FileChange[]) => void;
 
 	onSpawnSubagent?: (prompt: string, label?: string) => Promise<{ sessionId: string }>;
+	onGitHubSync?: () => void;
 
 	pendingPrompt?: string;
 
@@ -176,7 +177,7 @@ function AssistantTurn({
 export function ChatCenter({
 
 	sessionId, workspace, workspaceEnv, settings, messages, onMessagesChange, onWorkspaceChange,
-	tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
+	tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, onGitHubSync, pendingPrompt, onPendingPromptConsumed,
 
 }: Props) {
 
@@ -734,14 +735,37 @@ export function ChatCenter({
 
 					<div className="chat-empty">
 
-						<div className="empty-glow" />
+						<div className="startup-badges">
+							<span className="startup-badge">{branchLabel === 'main' ? 'copix' : branchLabel}</span>
+							<span className="startup-badge">{branchLabel}</span>
+							<span className="startup-badge">
+								<IconCloud width={12} height={12} />
+								{locationLabel}
+							</span>
+						</div>
 
-						<h2>What should we build?</h2>
-
-						<p>Describe your project — I'll create the repo, write code, and run commands.</p>
+						<div className="startup-card">
+							<p className="startup-placeholder">Plan, Build, / for skills, @ for context</p>
+							<div className="startup-actions">
+								<button type="button" className="startup-chip primary" onClick={onGitHubSync}>
+									<IconCloud width={13} height={13} />
+									GitHub Sync
+								</button>
+								<button
+									type="button"
+									className="startup-chip"
+									onClick={() => {
+										setSessionMode('plan');
+										inputRef.current?.focus();
+									}}
+								>
+									Plan New Idea
+								</button>
+							</div>
+						</div>
 
 						<div className="suggestion-grid">
-							{SUGGESTIONS.map(s => (
+							{SUGGESTIONS.slice(0, 2).map(s => (
 								<button
 									key={s.title}
 									type="button"

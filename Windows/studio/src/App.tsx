@@ -364,10 +364,14 @@ function AppInner() {
 	}, [activeSessionId, sessions]);
 
 	const paletteCommands: PaletteCommand[] = [
-		{ id: 'new-agent', label: 'New agent', hint: 'Start a fresh conversation', run: handleNewChat },
-		{ id: 'focus-agent', label: 'Focus agent input', hint: 'Ctrl+L', run: focusComposer },
-		{ id: 'toggle-editor', label: editorVisible ? 'Hide editor panel' : 'Show editor panel', hint: 'Ctrl+B', run: () => setEditorVisible(v => !v) },
-		{ id: 'open-folder', label: 'Open folder…', hint: 'Attach a local folder to this chat', run: openFolder },
+		{ id: 'new-agent', label: 'New Agent', hint: 'Agent', category: 'actions', run: handleNewChat },
+		{ id: 'focus-agent', label: 'Focus Agent Input', hint: 'Ctrl+L', category: 'actions', run: focusComposer },
+		{ id: 'toggle-editor', label: editorVisible ? 'Hide Editor Panel' : 'Show Editor Panel', hint: 'Ctrl+B', category: 'actions', run: () => setEditorVisible(v => !v) },
+		{ id: 'open-folder', label: 'Open Folder…', hint: 'Files', category: 'files', run: openFolder },
+		{ id: 'github-sync', label: 'GitHub Sync…', hint: 'Clone a GitHub repository', category: 'settings', run: () => {
+			const url = window.prompt('GitHub repository URL');
+			if (url?.trim()) void cloneRepo(url.trim());
+		} },
 	];
 
 	return (
@@ -441,6 +445,10 @@ function AppInner() {
 							setEditorVisible(true);
 							setPanelMode('changes');
 						}}
+						onGitHubSync={() => {
+							const url = window.prompt('GitHub repository URL');
+							if (url?.trim()) void cloneRepo(url.trim());
+						}}
 						onSpawnSubagent={handleSpawnSubagent}
 						pendingPrompt={activeSession?.pendingPrompt}
 						onPendingPromptConsumed={() => patchSession(activeSessionId, { pendingPrompt: undefined })}
@@ -512,6 +520,16 @@ function AppInner() {
 			<CommandPalette
 				open={paletteOpen}
 				commands={paletteCommands}
+				recentAgents={sessions
+					.filter(s => !s.archived && !s.parentSessionId)
+					.slice(0, 8)
+					.map(s => ({
+						id: s.id,
+						label: s.title || 'New agent',
+						repo: s.workspaceRoot?.replace(/\\/g, '/').split('/').filter(Boolean).pop(),
+						time: 'recent',
+						run: () => setActiveSessionId(s.id),
+					}))}
 				onClose={() => setPaletteOpen(false)}
 			/>
 		</div>

@@ -118,7 +118,14 @@ export function EditorArea({
 
 	const menuItems = useMemo(() => {
 		const q = plusQuery.trim().toLowerCase();
-		return PANEL_DEFS.filter(d => !q || d.label.toLowerCase().includes(q));
+		const items = [
+			{ id: 'files' as const, label: 'File', hint: '⌘G', Icon: IconFile },
+			{ id: 'terminal' as const, label: 'Terminal', hint: '⌘J', Icon: IconTerminal },
+			{ id: 'browser' as const, label: 'Browser', hint: '⇧⌘B', Icon: IconGlobe },
+			{ id: 'files' as const, label: 'Desktop', hint: '', Icon: IconFile },
+			{ id: 'browser' as const, label: 'Canvas', hint: '', Icon: IconGlobe },
+		];
+		return items.filter(d => !q || d.label.toLowerCase().includes(q));
 	}, [plusQuery]);
 
 	return (
@@ -161,7 +168,7 @@ export function EditorArea({
 							<div className="panel-plus-menu fade-in">
 								<input
 									className="panel-plus-search"
-									placeholder="Open File, Terminal, Browser…"
+									placeholder="Open any file, URL, ..."
 									value={plusQuery}
 									autoFocus
 									onChange={e => setPlusQuery(e.target.value)}
@@ -179,7 +186,8 @@ export function EditorArea({
 										}}
 									>
 										<item.Icon width={14} height={14} />
-										{item.label}
+										<span>{item.label}</span>
+										{item.hint && <span className="panel-plus-item-hint">{item.hint}</span>}
 									</button>
 								))}
 							</div>

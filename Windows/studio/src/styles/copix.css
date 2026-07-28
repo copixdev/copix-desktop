@@ -1892,19 +1892,6 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	color: #fff;
 	cursor: pointer;
 }
-.user-prompt-images {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-bottom: 8px;
-}
-.user-prompt-image {
-	max-width: 240px;
-	max-height: 180px;
-	border-radius: 10px;
-	border: 1px solid var(--border);
-}
-
 .composer {
 	padding: 0 12px 12px;
 	flex-shrink: 0;
@@ -1939,6 +1926,10 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	flex: 1;
 	min-width: 0;
 }
+.composer-plus-wrap {
+	position: relative;
+	flex-shrink: 0;
+}
 .composer-plus,
 .composer-mic {
 	flex-shrink: 0;
@@ -1958,8 +1949,73 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	color: #ececf1;
 	background: rgba(255,255,255,0.05);
 }
+.composer-plus.open {
+	color: #ececf1;
+	background: rgba(255,255,255,0.07);
+}
 .composer-plus:disabled,
 .composer-mic:disabled { opacity: 0.35; cursor: default; }
+.composer-plus-menu {
+	position: absolute;
+	left: 0;
+	bottom: calc(100% + 10px);
+	width: 320px;
+	padding: 12px 0;
+	border-radius: 18px;
+	border: 1px solid rgba(255,255,255,0.08);
+	background: #1a1a1d;
+	box-shadow: 0 22px 44px rgba(0, 0, 0, 0.45);
+	z-index: 35;
+}
+.composer-plus-search {
+	margin: 0 12px 10px;
+	padding: 0 2px 12px;
+	border-bottom: 1px solid rgba(255,255,255,0.08);
+	color: #6b6b73;
+	font-size: 13px;
+}
+.composer-plus-shortcuts {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 0 12px 10px;
+}
+.composer-plus-shortcut,
+.composer-plus-entry {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	width: 100%;
+	padding: 10px 14px;
+	border: none;
+	background: transparent;
+	color: #ececf1;
+	font: inherit;
+	font-size: 13px;
+	border-radius: 12px;
+	text-align: left;
+	cursor: pointer;
+}
+.composer-plus-shortcut:hover,
+.composer-plus-entry:hover {
+	background: rgba(255,255,255,0.05);
+}
+.composer-plus-entry-left {
+	display: inline-flex;
+	align-items: center;
+	gap: 12px;
+}
+.composer-plus-shortcut svg,
+.composer-plus-entry svg {
+	color: #b6b6bd;
+	flex-shrink: 0;
+}
+.composer-plus-divider {
+	height: 1px;
+	margin: 0 0 10px;
+	background: rgba(255,255,255,0.08);
+}
 .composer-auto {
 	flex-shrink: 0;
 	display: inline-flex;

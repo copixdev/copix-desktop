@@ -36,7 +36,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand } from './Icons';
+import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconFile, IconBrain, IconCommand, IconLink } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
@@ -217,6 +217,7 @@ export function ChatCenter({
 	const endRef = useRef<HTMLDivElement>(null);
 	const autoFollowRef = useRef(true);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
+	const plusMenuRef = useRef<HTMLDivElement>(null);
 
 	const commandMenu = useComposerCommands(input, caret, tree);
 	const commandVisible = Boolean(commandMenu && commandMenu.items.length && !cmdDismissed);
@@ -224,6 +225,7 @@ export function ChatCenter({
 
 
 	const [sessionMode, setSessionMode] = useState<AgentMode | null>(null);
+	const [plusMenuOpen, setPlusMenuOpen] = useState(false);
 	const agentMode = sessionMode ?? settings.agentMode;
 
 	const config = useMemo(
@@ -286,6 +288,15 @@ export function ChatCenter({
 	useEffect(() => {
 		setSessionMode(null);
 	}, [sessionId]);
+
+	useEffect(() => {
+		if (!plusMenuOpen) return;
+		const onDoc = (e: MouseEvent) => {
+			if (!plusMenuRef.current?.contains(e.target as Node)) setPlusMenuOpen(false);
+		};
+		document.addEventListener('mousedown', onDoc);
+		return () => document.removeEventListener('mousedown', onDoc);
+	}, [plusMenuOpen]);
 
 	// Blank slate when switching agents — abort in-flight work and clear local UI state.
 	useEffect(() => {
@@ -648,6 +659,12 @@ export function ChatCenter({
 		setStatus('');
 	};
 
+	const pickQuickMode = (mode: AgentMode) => {
+		setSessionMode(mode);
+		setPlusMenuOpen(false);
+		requestAnimationFrame(() => inputRef.current?.focus());
+	};
+
 	return (
 
 		<div className="chat-center">
@@ -856,15 +873,71 @@ export function ChatCenter({
 					)}
 
 					<div className="composer-row">
-						<button
-							type="button"
-							className="composer-plus"
-							title="Attach image"
-							disabled={running || attachments.length >= 5}
-							onClick={() => fileInputRef.current?.click()}
-						>
-							<IconPlus width={16} height={16} />
-						</button>
+						<div className="composer-plus-wrap" ref={plusMenuRef}>
+							<button
+								type="button"
+								className={`composer-plus${plusMenuOpen ? ' open' : ''}`}
+								title="Add agents, context, tools"
+								disabled={running}
+								onClick={() => setPlusMenuOpen(v => !v)}
+							>
+								<IconPlus width={16} height={16} />
+							</button>
+							{plusMenuOpen && (
+								<div className="composer-plus-menu">
+									<div className="composer-plus-search">Add agents, context, tools...</div>
+									<div className="composer-plus-shortcuts">
+										<button type="button" className="composer-plus-shortcut" onClick={() => pickQuickMode('plan')}>
+											<IconCommand width={16} height={16} />
+											<span>Plan</span>
+										</button>
+										<button type="button" className="composer-plus-shortcut" onClick={() => pickQuickMode('debug')}>
+											<IconBrain width={16} height={16} />
+											<span>Debug</span>
+										</button>
+										<button type="button" className="composer-plus-shortcut" onClick={() => pickQuickMode('code')}>
+											<IconCopy width={16} height={16} />
+											<span>Ask</span>
+										</button>
+									</div>
+									<div className="composer-plus-divider" />
+									<button
+										type="button"
+										className="composer-plus-entry"
+										onClick={() => {
+											setPlusMenuOpen(false);
+											fileInputRef.current?.click();
+										}}
+									>
+										<span className="composer-plus-entry-left">
+											<IconFile width={16} height={16} />
+											<span>Files</span>
+										</span>
+									</button>
+									<button type="button" className="composer-plus-entry">
+										<span className="composer-plus-entry-left">
+											<IconBrain width={16} height={16} />
+											<span>Models</span>
+										</span>
+										<IconChevron width={14} height={14} />
+									</button>
+									<button type="button" className="composer-plus-entry">
+										<span className="composer-plus-entry-left">
+											<IconCommand width={16} height={16} />
+											<span>Skills</span>
+										</span>
+										<IconChevron width={14} height={14} />
+									</button>
+									<button type="button" className="composer-plus-entry">
+										<span className="composer-plus-entry-left">
+											<IconLink width={16} height={16} />
+											<span>MCP Servers</span>
+										</span>
+										<IconChevron width={14} height={14} />
+									</button>
+								</div>
+							)}
+						</div>
 						<textarea
 							ref={inputRef}
 							className="composer-input"

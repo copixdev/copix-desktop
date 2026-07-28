@@ -61,7 +61,7 @@ export function TerminalPanel({ workspace }: Props) {
 				setLines(prev => [
 					...prev,
 					{ id: metaId, kind: 'meta', text: '[agent]' },
-					{ id: inId, kind: 'in', text: `${shellPrompt(shortCwd(event.cwd ?? workspace))} ${event.command}` },
+					{ id: inId, kind: 'in', text: `${shellPrompt(event.cwd ?? workspace ?? '')} ${event.command}` },
 					{ id: outId, kind: 'out', text: '' },
 				]);
 				return;
@@ -90,7 +90,7 @@ export function TerminalPanel({ workspace }: Props) {
 		setInput('');
 		setLines(prev => [
 			...prev,
-			{ id: ++lineId, kind: 'in', text: `${shellPrompt(shortCwd(workspace))} ${trimmed}` },
+			{ id: ++lineId, kind: 'in', text: `${shellPrompt(workspace ?? '')} ${trimmed}` },
 		]);
 
 		if (trimmed.toLowerCase() === 'clear' || trimmed.toLowerCase() === 'cls') {
@@ -132,7 +132,7 @@ export function TerminalPanel({ workspace }: Props) {
 				<div ref={endRef} />
 			</div>
 			<div className="terminal-prompt-row">
-				<span className="terminal-ps">{shellPrompt(shortCwd(workspace))}</span>
+				<span className="terminal-ps">{shellPrompt(workspace ?? '')}</span>
 				<input
 					ref={inputRef}
 					className="terminal-input"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { copix } from '../api';
+import { isWindows, shellLabel, shellPrompt } from '../utils/platform';
 import { subscribeAgentTerminal } from '../utils/terminalBridge';
 
 interface Props {
@@ -16,8 +17,12 @@ let lineId = 0;
 
 function shortCwd(p?: string): string {
 	if (!p) return '~';
-	const norm = p.replace(/\//g, '\\');
+	const norm = isWindows() ? p.replace(/\//g, '\\') : p.replace(/\\/g, '/');
 	return norm.length > 48 ? `…${norm.slice(-46)}` : norm;
+}
+
+function banner(workspace?: string): string {
+	return `${shellLabel()} — ${shortCwd(workspace)}`;
 }
 
 function newStreamId(): string {
@@ -26,7 +31,7 @@ function newStreamId(): string {
 
 export function TerminalPanel({ workspace }: Props) {
 	const [lines, setLines] = useState<Line[]>(() => [
-		{ id: ++lineId, kind: 'meta', text: `PowerShell — ${shortCwd(workspace)}` },
+		{ id: ++lineId, kind: 'meta', text: banner(workspace) },
 		{ id: ++lineId, kind: 'meta', text: 'Type a command and press Enter. Ctrl+L clears.' },
 	]);
 	const [input, setInput] = useState('');
@@ -56,7 +61,7 @@ export function TerminalPanel({ workspace }: Props) {
 				setLines(prev => [
 					...prev,
 					{ id: metaId, kind: 'meta', text: '[agent]' },
-					{ id: inId, kind: 'in', text: `PS ${shortCwd(event.cwd ?? workspace)}> ${event.command}` },
+					{ id: inId, kind: 'in', text: `${shellPrompt(event.cwd ?? workspace ?? '')} ${event.command}` },
 					{ id: outId, kind: 'out', text: '' },
 				]);
 				return;
@@ -85,11 +90,11 @@ export function TerminalPanel({ workspace }: Props) {
 		setInput('');
 		setLines(prev => [
 			...prev,
-			{ id: ++lineId, kind: 'in', text: `PS ${shortCwd(workspace)}> ${trimmed}` },
+			{ id: ++lineId, kind: 'in', text: `${shellPrompt(workspace ?? '')} ${trimmed}` },
 		]);
 
 		if (trimmed.toLowerCase() === 'clear' || trimmed.toLowerCase() === 'cls') {
-			setLines([{ id: ++lineId, kind: 'meta', text: `PowerShell — ${shortCwd(workspace)}` }]);
+			setLines([{ id: ++lineId, kind: 'meta', text: banner(workspace) }]);
 			return;
 		}
 
@@ -127,7 +132,7 @@ export function TerminalPanel({ workspace }: Props) {
 				<div ref={endRef} />
 			</div>
 			<div className="terminal-prompt-row">
-				<span className="terminal-ps">PS {shortCwd(workspace)}&gt;</span>
+				<span className="terminal-ps">{shellPrompt(workspace ?? '')}</span>
 				<input
 					ref={inputRef}
 					className="terminal-input"
@@ -144,7 +149,7 @@ export function TerminalPanel({ workspace }: Props) {
 						}
 						if (e.key === 'l' && e.ctrlKey) {
 							e.preventDefault();
-							setLines([{ id: ++lineId, kind: 'meta', text: `PowerShell — ${shortCwd(workspace)}` }]);
+							setLines([{ id: ++lineId, kind: 'meta', text: banner(workspace) }]);
 						}
 					}}
 				/>

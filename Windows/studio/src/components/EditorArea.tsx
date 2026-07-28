@@ -6,9 +6,10 @@ import { TerminalPanel } from './TerminalPanel';
 import { ChangesPanel } from './ChangesPanel';
 import type { FileChange } from '../utils/fileChanges';
 import {
-	IconX, IconPlus, IconPanelRight,
+	IconX, IconPlus, IconPanelRight, IconExpand,
 	IconBranch, IconGlobe, IconTerminal, IconFile, IconFolder, IconChevron,
 } from './Icons';
+import { shellLabel } from '../utils/platform';
 
 export type SidePanelMode = 'hub' | 'changes' | 'terminal' | 'files' | 'browser';
 
@@ -31,14 +32,20 @@ interface Props {
 	onOpenFolder?: () => void;
 	onFocusComposer?: () => void;
 	onTogglePanel?: () => void;
+	onExpandPanel?: () => void;
 }
 
 const PANEL_DEFS: { id: OpenableMode; label: string; Icon: typeof IconFile }[] = [
 	{ id: 'files', label: 'File', Icon: IconFile },
-	{ id: 'terminal', label: 'Terminal', Icon: IconTerminal },
+	{ id: 'terminal', label: 'bash', Icon: IconTerminal },
 	{ id: 'browser', label: 'Browser', Icon: IconGlobe },
 	{ id: 'changes', label: 'Changes', Icon: IconBranch },
 ];
+
+function panelLabel(id: OpenableMode): string {
+	if (id === 'terminal') return shellLabel().toLowerCase();
+	return PANEL_DEFS.find(d => d.id === id)?.label ?? id;
+}
 
 function lang(path: string): string {
 	if (path.endsWith('.tsx') || path.endsWith('.ts')) return 'typescript';
@@ -61,7 +68,7 @@ export function EditorArea({
 	tabs, activePath, workspace, tree, theme = 'dark',
 	fileChanges = [], mode: modeProp, onModeChange,
 	onSelect, onClose, onChange, onOpenFile,
-	onOpenFolder, onFocusComposer, onTogglePanel,
+	onOpenFolder, onFocusComposer, onTogglePanel, onExpandPanel,
 }: Props) {
 	const [mode, setMode] = useState<SidePanelMode>(modeProp ?? (tabs.length ? 'files' : 'hub'));
 	const [openTabs, setOpenTabs] = useState<OpenableMode[]>(() =>
@@ -117,57 +124,20 @@ export function EditorArea({
 	return (
 		<div className="editor-shell side-panel">
 			<div className="side-panel-toolbar panel-tabbar">
-				<div className="panel-plus-wrap" ref={plusRef}>
-					<button
-						type="button"
-						className={`panel-plus-btn${plusOpen ? ' open' : ''}`}
-						title="Open panel"
-						onClick={() => setPlusOpen(v => !v)}
-					>
-						<IconPlus width={14} height={14} />
-					</button>
-					{plusOpen && (
-						<div className="panel-plus-menu fade-in">
-							<input
-								className="panel-plus-search"
-								placeholder="Open any file, URL, …"
-								value={plusQuery}
-								autoFocus
-								onChange={e => setPlusQuery(e.target.value)}
-							/>
-							{menuItems.map(item => (
-								<button
-									key={item.id}
-									type="button"
-									className={`panel-plus-item${mode === item.id ? ' active' : ''}`}
-									onClick={() => {
-										if (item.id === 'files') onOpenFolder?.();
-										go(item.id);
-										setPlusOpen(false);
-										setPlusQuery('');
-									}}
-								>
-									<item.Icon width={14} height={14} />
-									{item.label}
-								</button>
-							))}
-						</div>
-					)}
-				</div>
-
 				<div className="side-panel-tabs">
 					{openTabs.map(id => {
 						const def = PANEL_DEFS.find(d => d.id === id)!;
+						const label = panelLabel(id);
 						return (
 							<div key={id} className={`panel-tab${mode === id ? ' active' : ''}`}>
 								<button type="button" className="panel-tab-main" onClick={() => go(id)}>
-									<def.Icon width={12} height={12} />
-									{def.label}
+									<def.Icon width={13} height={13} />
+									<span>{label}</span>
 								</button>
 								<button
 									type="button"
 									className="panel-tab-x"
-									title={`Close ${def.label}`}
+									title={`Close ${label}`}
 									onClick={e => {
 										e.stopPropagation();
 										closeTab(id);
@@ -178,17 +148,70 @@ export function EditorArea({
 							</div>
 						);
 					})}
+					<div className="panel-plus-wrap" ref={plusRef}>
+						<button
+							type="button"
+							className={`panel-plus-btn${plusOpen ? ' open' : ''}`}
+							title="Open panel"
+							onClick={() => setPlusOpen(v => !v)}
+						>
+							<IconPlus width={14} height={14} />
+						</button>
+						{plusOpen && (
+							<div className="panel-plus-menu fade-in">
+								<input
+									className="panel-plus-search"
+									placeholder="Open File, Terminal, Browser…"
+									value={plusQuery}
+									autoFocus
+									onChange={e => setPlusQuery(e.target.value)}
+								/>
+								{menuItems.map(item => (
+									<button
+										key={item.id}
+										type="button"
+										className={`panel-plus-item${mode === item.id ? ' active' : ''}`}
+										onClick={() => {
+											if (item.id === 'files') onOpenFolder?.();
+											go(item.id);
+											setPlusOpen(false);
+											setPlusQuery('');
+										}}
+									>
+										<item.Icon width={14} height={14} />
+										{item.label}
+									</button>
+								))}
+							</div>
+						)}
+					</div>
 				</div>
 
 				<div className="side-panel-toolbar-right">
-					<button type="button" className="btn-icon" title="Collapse" onClick={() => go('hub')}>
-						<IconChevron width={12} height={12} style={{ transform: 'rotate(-90deg)' }} />
+					<button type="button" className="btn-icon" title="Expand panel" onClick={onExpandPanel}>
+						<IconExpand width={13} height={13} />
 					</button>
 					<button type="button" className="btn-icon" title="Toggle panel" onClick={onTogglePanel}>
 						<IconPanelRight width={14} height={14} />
 					</button>
 				</div>
 			</div>
+
+			{mode !== 'hub' && (
+				<div className="panel-subheader">
+					<span className="panel-subheader-title">
+						{panelLabel(mode as OpenableMode)}
+					</span>
+					<button
+						type="button"
+						className="panel-subheader-collapse"
+						title="Collapse to hub"
+						onClick={() => go('hub')}
+					>
+						<IconChevron width={12} height={12} style={{ transform: 'rotate(180deg)' }} />
+					</button>
+				</div>
+			)}
 
 			{mode === 'hub' && (
 				<div className="panel-idle">

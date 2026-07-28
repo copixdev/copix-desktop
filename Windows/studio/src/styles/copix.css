@@ -1077,61 +1077,57 @@ body.platform-darwin .titlebar {
 }
 .files-changed-more { color: var(--text-3); }
 
-/* Side panel chrome */
-.side-panel { background: var(--bg-0); }
+/* Side panel chrome — matches Cursor-style tabbed sidebar */
+.side-panel {
+	background: #141416;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
 .side-panel-toolbar {
 	display: flex;
 	align-items: center;
-	gap: 4px;
-	padding: 6px 8px;
-	border-bottom: 1px solid var(--border);
-	background: var(--bg-0);
+	gap: 2px;
+	padding: 0 6px 0 4px;
+	height: 36px;
+	border-bottom: 1px solid rgba(255,255,255,0.06);
+	background: #1a1a1c;
 	flex-shrink: 0;
 }
 .side-panel-tabs {
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: 0;
 	flex: 1;
 	min-width: 0;
 	overflow-x: auto;
+	scrollbar-width: none;
 }
-.side-panel-tab {
-	display: inline-flex;
+.side-panel-tabs::-webkit-scrollbar { display: none; }
+.side-panel-toolbar-right {
+	display: flex;
 	align-items: center;
-	gap: 5px;
-	border: none;
-	background: transparent;
-	color: var(--text-3);
-	font: inherit;
-	font-size: 11px;
-	font-weight: 500;
-	padding: 4px 8px;
-	border-radius: 6px;
-	cursor: pointer;
-	white-space: nowrap;
+	gap: 2px;
+	margin-left: auto;
+	padding-left: 6px;
 }
-.side-panel-tab:hover { color: var(--text); background: var(--hover); }
-.side-panel-tab.active { color: var(--text); background: var(--bg-3); }
-.side-panel-toolbar-right { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 
-/* Right panel tabs (image 1) + plus menu (image 3) */
 .panel-tabbar { position: relative; }
-.panel-plus-wrap { position: relative; flex-shrink: 0; }
+.panel-plus-wrap { position: relative; flex-shrink: 0; margin-left: 2px; }
 .panel-plus-btn {
-	width: 26px;
-	height: 26px;
+	width: 28px;
+	height: 28px;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	border: none;
-	border-radius: 7px;
-	background: var(--bg-3);
-	color: var(--text-2);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-3);
 	cursor: pointer;
 }
 .panel-plus-btn:hover,
-.panel-plus-btn.open { background: var(--bg-4); color: var(--text); }
+.panel-plus-btn.open { background: rgba(255,255,255,0.06); color: var(--text); }
 .panel-plus-menu {
 	position: absolute;
 	top: calc(100% + 6px);
@@ -1177,52 +1173,82 @@ body.platform-darwin .titlebar {
 }
 .panel-plus-item:hover,
 .panel-plus-item.active { background: var(--bg-3); color: var(--text); }
+
 .panel-tab {
 	display: inline-flex;
 	align-items: center;
-	gap: 2px;
-	padding: 0 2px 0 0;
-	border-radius: 7px;
-	color: var(--text-3);
+	height: 36px;
+	padding: 0 2px;
+	border-bottom: 2px solid transparent;
+	color: #8b8b93;
 	flex-shrink: 0;
 }
-.panel-tab:hover { background: var(--hover); color: var(--text-2); }
+.panel-tab:hover { color: #c8c8d0; background: rgba(255,255,255,0.03); }
 .panel-tab.active {
-	background: var(--bg-3);
-	color: var(--text);
+	color: #ececf1;
+	border-bottom-color: #ececf1;
+	background: transparent;
 }
 .panel-tab-main {
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
+	gap: 6px;
 	border: none;
 	background: transparent;
 	color: inherit;
 	font: inherit;
-	font-size: 11.5px;
+	font-size: 12px;
 	font-weight: 500;
-	padding: 5px 4px 5px 8px;
+	padding: 0 8px;
+	height: 100%;
 	cursor: pointer;
 	white-space: nowrap;
 }
 .panel-tab-x {
+	opacity: 0;
 	width: 18px;
 	height: 18px;
-	margin-right: 4px;
 	border: none;
-	background: transparent;
-	color: var(--text-3);
 	border-radius: 4px;
+	background: transparent;
+	color: inherit;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
-	opacity: 0;
-	transition: opacity 0.12s ease, background 0.12s ease;
+	margin-right: 4px;
 }
 .panel-tab:hover .panel-tab-x,
-.panel-tab.active .panel-tab-x { opacity: 1; }
-.panel-tab-x:hover { background: var(--bg-4); color: var(--text); }
+.panel-tab.active .panel-tab-x { opacity: 0.7; }
+.panel-tab-x:hover { opacity: 1 !important; background: rgba(255,255,255,0.08); }
+
+.panel-subheader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 10px;
+	border-bottom: 1px solid rgba(255,255,255,0.05);
+	background: #121214;
+	flex-shrink: 0;
+}
+.panel-subheader-title {
+	font-size: 12px;
+	font-weight: 500;
+	color: #c8c8d0;
+	text-transform: lowercase;
+}
+.panel-subheader-collapse {
+	width: 22px;
+	height: 22px;
+	border: 1px solid rgba(255,255,255,0.08);
+	border-radius: 5px;
+	background: transparent;
+	color: #8b8b93;
+	display: grid;
+	place-items: center;
+	cursor: pointer;
+}
+.panel-subheader-collapse:hover { color: #ececf1; background: rgba(255,255,255,0.05); }
 
 .panel-idle {
 	height: 100%;
@@ -1346,13 +1372,13 @@ body.platform-darwin .titlebar {
 	word-break: break-all;
 }
 
-/* Terminal */
+/* Terminal — Cursor-style sidebar terminal */
 .terminal-panel {
 	flex: 1;
 	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	background: var(--bg-0);
+	background: #0f0f10;
 	font-family: var(--mono);
 	cursor: text;
 }
@@ -1360,30 +1386,31 @@ body.platform-darwin .titlebar {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
-	padding: 10px 12px;
+	padding: 14px 16px 8px;
 }
 .terminal-line {
-	margin: 0 0 4px;
-	font-size: 12px;
-	line-height: 1.45;
+	margin: 0 0 2px;
+	font-size: 12.5px;
+	line-height: 1.5;
 	white-space: pre-wrap;
 	word-break: break-word;
-	color: var(--text-2);
+	color: #c8c8d0;
 }
-.terminal-line.in { color: var(--text); }
-.terminal-line.meta { color: var(--text-3); }
+.terminal-line.in { color: #ececf1; }
+.terminal-line.meta { color: #6b6b73; }
 .terminal-prompt-row {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	padding: 8px 12px;
-	border-top: 1px solid var(--border);
-	background: var(--bg-1);
+	padding: 10px 16px 14px;
+	border-top: none;
+	background: #0f0f10;
 }
 .terminal-ps {
+	color: #5eead4;
+	font-size: 12.5px;
+	font-weight: 500;
 	flex-shrink: 0;
-	font-size: 12px;
-	color: var(--accent-2);
 	white-space: nowrap;
 	max-width: 45%;
 	overflow: hidden;
@@ -1393,12 +1420,14 @@ body.platform-darwin .titlebar {
 	flex: 1;
 	min-width: 0;
 	border: none;
-	outline: none;
 	background: transparent;
-	color: var(--text);
+	color: #ececf1;
 	font: inherit;
 	font-size: 12.5px;
+	outline: none;
+	caret-color: #ececf1;
 }
+.terminal-input::placeholder { color: #4a4a52; }
 
 .browser-panel {
 	flex: 1;

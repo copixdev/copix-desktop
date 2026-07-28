@@ -509,6 +509,10 @@ function AppInner() {
 						}}
 						onFocusComposer={focusComposer}
 						onTogglePanel={() => setEditorVisible(v => !v)}
+						onExpandPanel={() => setSettings(prev => ({
+							...prev,
+							layout: { ...prev.layout, editorWidth: 640 },
+						}))}
 					/>
 				}
 				/>

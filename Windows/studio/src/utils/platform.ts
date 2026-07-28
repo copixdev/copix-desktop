@@ -32,10 +32,12 @@ export function shellLabel(): string {
 	return 'bash';
 }
 
-/** Prompt prefix shown in the terminal (e.g. PS or $). */
+/** Prompt prefix shown in the terminal (e.g. `workspace $`). */
 export function shellPrompt(cwd: string): string {
 	if (isWindows()) return `PS ${cwd}>`;
-	return `${cwd} $`;
+	const parts = cwd.replace(/\\/g, '/').split('/').filter(Boolean);
+	const leaf = parts[parts.length - 1] || '~';
+	return `${leaf} $`;
 }
 
 /** Example home path for settings placeholders / docs. */

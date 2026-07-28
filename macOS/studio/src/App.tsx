@@ -12,7 +12,7 @@ import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData
 import { DEFAULT_SETTINGS, AppSettings } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
-import { normalizeProvider } from './models/modelCatalog';
+import { normalizeProvider, sanitizeGroqModelId } from './models/modelCatalog';
 import { formatModelChipLabel, preferredModelForTask } from './models/modelSelector';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
@@ -97,14 +97,16 @@ function AppInner() {
 				return;
 			}
 			const raw = s as AppSettings & { model?: Partial<AppSettings['model']> };
+			const provider = normalizeProvider(raw.model?.provider ?? DEFAULT_SETTINGS.model.provider);
+			const rawModelId = raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId;
 			setSettings({
 				...DEFAULT_SETTINGS, ...raw,
 				model: {
 					...DEFAULT_SETTINGS.model,
 					...raw.model,
 					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
-					modelId: raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId,
-					provider: raw.model?.provider ?? DEFAULT_SETTINGS.model.provider,
+					modelId: provider === 'groq' ? sanitizeGroqModelId(rawModelId) : rawModelId,
+					provider,
 					// Keep disk key as-is — never fall back to a placeholder that overwrites the file.
 					apiKey: typeof raw.model?.apiKey === 'string' ? raw.model.apiKey : '',
 				},

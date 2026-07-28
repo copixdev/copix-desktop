@@ -8,6 +8,7 @@ import {
 	GROQ_TASK_MODEL_PREFERENCE,
 	MODE_MODEL_PREFERENCE,
 	normalizeProvider,
+	sanitizeGroqModelId,
 	TASK_MODEL_PREFERENCE,
 	modelIsAvailable,
 	type TaskKind,
@@ -95,7 +96,7 @@ export function selectModelForTask(
 
 	if (normalized.selection === 'manual') {
 		const manual = normalized.modelId || (provider === 'groq' ? GROQ_FALLBACK_MODEL : FALLBACK_MODEL_ID);
-		if (provider === 'groq') return manual;
+		if (provider === 'groq') return sanitizeGroqModelId(manual);
 		if (modelIsAvailable(manual, installed)) return manual;
 		return modelIsAvailable(FALLBACK_MODEL_ID, installed) ? FALLBACK_MODEL_ID : manual;
 	}
@@ -106,7 +107,7 @@ export function selectModelForTask(
 		const preferred = taskKind
 			? GROQ_TASK_MODEL_PREFERENCE[taskKind]
 			: GROQ_MODE_MODEL_PREFERENCE[agentMode] ?? GROQ_FALLBACK_MODEL;
-		return pickGroqModel([preferred, GROQ_FALLBACK_MODEL]);
+		return sanitizeGroqModelId(pickGroqModel([preferred, GROQ_FALLBACK_MODEL]));
 	}
 
 	const preferred = taskKind
@@ -124,9 +125,10 @@ export function preferredModelForTask(
 	const provider = normalizeProvider(settings.provider);
 	const taskKind = userMessage ? inferTaskKind(userMessage, agentMode) : null;
 	if (provider === 'groq') {
-		return taskKind
+		const preferred = taskKind
 			? GROQ_TASK_MODEL_PREFERENCE[taskKind]
 			: GROQ_MODE_MODEL_PREFERENCE[agentMode] ?? GROQ_FALLBACK_MODEL;
+		return sanitizeGroqModelId(preferred);
 	}
 	return taskKind
 		? TASK_MODEL_PREFERENCE[taskKind]
@@ -143,7 +145,7 @@ export function formatModelChipLabel(
 	const prefix = normalized.selection === 'manual' ? '' : 'auto · ';
 
 	if (provider === 'groq') {
-		return `${prefix}${activeModel}`;
+		return `${prefix}${sanitizeGroqModelId(activeModel)}`;
 	}
 
 	const preferred = opts?.preferred;

@@ -51,10 +51,6 @@ function AppInner() {
 
 	const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
 	const workspace = activeSession?.workspaceRoot;
-	const openAgentTabs = useMemo(
-		() => sessions.filter(s => !s.archived && !s.parentSessionId).slice(0, 8),
-		[sessions],
-	);
 	const subagentSessions = useMemo(
 		() => sessions.filter(s =>
 			s.parentSessionId && !s.archived && !s.subagentDismissed && s.id !== activeSessionId,
@@ -101,14 +97,16 @@ function AppInner() {
 				return;
 			}
 			const raw = s as AppSettings & { model?: Partial<AppSettings['model']> };
+			const provider = normalizeProvider(raw.model?.provider ?? DEFAULT_SETTINGS.model.provider);
+			const rawModelId = raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId;
 			setSettings({
 				...DEFAULT_SETTINGS, ...raw,
 				model: {
 					...DEFAULT_SETTINGS.model,
 					...raw.model,
 					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
-					modelId: raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId,
-					provider: raw.model?.provider ?? DEFAULT_SETTINGS.model.provider,
+					modelId: provider === 'groq' ? sanitizeGroqModelId(rawModelId) : rawModelId,
+					provider,
 					// Keep disk key as-is — never fall back to a placeholder that overwrites the file.
 					apiKey: typeof raw.model?.apiKey === 'string' ? raw.model.apiKey : '',
 				},

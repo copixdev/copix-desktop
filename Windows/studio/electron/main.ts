@@ -61,6 +61,27 @@ let mainWindow: BrowserWindow | undefined;
 
 const OLLAMA_HOST = 'http://127.0.0.1:11434';
 
+/** GUI apps on macOS often miss Homebrew / nvm PATH — restore common tool locations. */
+function terminalEnv(): NodeJS.ProcessEnv {
+	const home = os.homedir();
+	const sep = process.platform === 'win32' ? ';' : ':';
+	const extras = process.platform === 'win32'
+		? []
+		: [
+			'/opt/homebrew/bin',
+			'/opt/homebrew/sbin',
+			'/usr/local/bin',
+			'/usr/local/sbin',
+			path.join(home, '.local', 'bin'),
+			path.join(home, '.nvm', 'current', 'bin'),
+			path.join(home, '.fnm', 'current', 'bin'),
+			path.join(home, '.volta', 'bin'),
+			path.join(home, '.asdf', 'shims'),
+		];
+	const merged = [...extras, process.env.PATH ?? ''].filter(Boolean).join(sep);
+	return { ...process.env, PATH: merged, HOME: home };
+}
+
 function readModelSettingsFromDisk(): { provider?: string; apiKey?: string } {
 	try {
 		const raw = fsSync.readFileSync(settingsPath(), 'utf8');
@@ -801,6 +822,14 @@ function looksLikeSecretPath(filePath: string): boolean {
 		const emit = (chunk: string) => {
 			if (streamChannel && chunk) event.sender.send(streamChannel, chunk);
 		};
+
+		if (isMac && /\bapt(-get)?\b|\byum\b|\bdnf\b/i.test(command)) {
+			const msg = 'Blocked: Linux package managers (apt/yum/dnf) are not available on macOS. '
+				+ 'Use Homebrew instead, e.g. `brew install node`, or install Node from https://nodejs.org.';
+			emit(msg + '\n');
+			return msg;
+		}
+
 		return new Promise<string>(resolve => {
 			if (isWin && wantsElevate) {
 				// Elevated PowerShell via UAC; write stdout/stderr to a temp log.
@@ -862,8 +891,14 @@ function looksLikeSecretPath(filePath: string): boolean {
 				return;
 			}
 			const proc = isWin
-				? spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-Command', command], { cwd: workDir })
-				: spawn(command, { cwd: workDir, shell: true });
+				? spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-Command', command], {
+					cwd: workDir,
+					env: terminalEnv(),
+				})
+				: spawn(isMac ? '/bin/zsh' : '/bin/bash', ['-lc', command], {
+					cwd: workDir,
+					env: terminalEnv(),
+				});
 			let out = '';
 			proc.stdout?.on('data', d => { const s = d.toString(); out += s; emit(s); });
 			proc.stderr?.on('data', d => { const s = d.toString(); out += s; emit(s); });

@@ -1,6 +1,6 @@
 import type { AgentMode } from './agentModes.js';
 import { getAgentMode } from './agentModes.js';
-import { projectPathExample, shellLabel } from '../utils/platform.js';
+import { isMac, isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
 import type { TaskKind } from './modelCatalog.js';
 import { isReadOnlyTask } from './modelSelector.js';
 
@@ -22,6 +22,26 @@ export const DEFAULT_RULES = [
 	'Use `spawn_subagent` **only** for hard multi-part jobs (large refactors, many independent files/features in parallel) when splitting clearly helps.',
 	`Use the \`terminal\` tool only when shell commands are required for the **current** user request (build/test/install the thing they asked for — not unrelated scripts).`,
 ];
+
+function hostOsRules(): string[] {
+	if (isWindows()) {
+		return [
+			'**Host OS: Windows.** Use PowerShell-friendly commands. Never use `apt-get`, `yum`, or Linux-only package managers.',
+			'If `npm`/`npx`/`node` are missing, tell the user to install Node.js from https://nodejs.org (or `winget install OpenJS.NodeJS.LTS`). Do not invent package managers.',
+		];
+	}
+	if (isMac()) {
+		return [
+			'**Host OS: macOS.** Never use `apt-get`, `yum`, `dnf`, or other Linux package managers.',
+			'Install tools with **Homebrew** (`brew install …`) when available. For Node.js prefer `brew install node` or the official installer — never `apt-get`.',
+			'Before scaffolding with `npx`/`npm`, run `which node && node -v && which npm` once. If missing, stop and tell the user to install Node — do not keep retrying failed installs.',
+			'Prefer writing project files with `write_file` (Vite/React templates by hand if needed) when the CLI is unavailable, instead of looping on `npx create-react-app`.',
+		];
+	}
+	return [
+		'**Host OS: Linux.** Use the distro package manager only when appropriate (`apt`/`dnf`/`pacman`). Prefer user-level installs when possible.',
+	];
+}
 
 const MODE_RULES: Record<AgentMode, string[]> = {
 	plan: [
@@ -123,6 +143,7 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
 	const readOnly = opts.taskKind ? isReadOnlyTask(opts.taskKind) : false;
 	const rules = [
 		...DEFAULT_RULES,
+		...hostOsRules(),
 		...(readOnly ? READ_ONLY_RULES : []),
 		...MODE_RULES[opts.mode],
 	];
@@ -134,11 +155,14 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
 		? `\n**User request (do this — nothing else):** ${opts.userMessage.trim().slice(0, 500)}\n`
 		: '';
 
+	const hostLabel = isWindows() ? 'Windows' : isMac() ? 'macOS' : 'Linux';
+
 	return `# Copix — Software Engineering Agent
 
 You are **Copix**, an expert software engineering agent in a Cursor-like IDE.
 
 **Mode:** ${modeDef.label} — ${modeDef.description}${taskLine}${requestLine}
+**Host:** ${hostLabel} · shell \`${shellLabel()}\` · example path \`${projectPathExample()}\`
 
 ## Rules
 

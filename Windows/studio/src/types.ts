@@ -78,7 +78,7 @@ export const DEFAULT_MODEL: ModelSettings = {
 	provider: 'groq',
 	apiKey: '',
 	selection: 'auto',
-	modelId: 'qwen2.5:3b',
+	modelId: 'llama-3.3-70b-versatile',
 	lowVram: false,
 };
 

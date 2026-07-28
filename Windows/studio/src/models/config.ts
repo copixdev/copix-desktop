@@ -9,7 +9,7 @@ export {
 export type { ModelProvider } from '../types.js';
 
 import type { AgentMode } from './agentModes.js';
-import { FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, GROQ_VISION_MODEL, normalizeProvider } from './modelCatalog.js';
+import { FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, GROQ_VISION_MODEL, normalizeProvider, sanitizeGroqModelId } from './modelCatalog.js';
 import type { ModelProvider } from '../types.js';
 import { selectModelForTask } from './modelSelector.js';
 import type { ModelSettings } from '../types.js';
@@ -40,7 +40,8 @@ export interface ModelConfig {
 
 export function settingsToConfig(model: ModelSettings, modelId?: string): ModelConfig {
 	const provider = normalizeProvider(model.provider);
-	const resolved = modelId ?? (model.modelId || FALLBACK_MODEL_ID);
+	let resolved = modelId ?? (model.modelId || FALLBACK_MODEL_ID);
+	if (provider === 'groq') resolved = sanitizeGroqModelId(resolved);
 
 	if (provider === 'groq') {
 		return {

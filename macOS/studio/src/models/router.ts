@@ -4,13 +4,13 @@ import { copix } from '../api.js';
 import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import type { TaskKind } from './modelCatalog.js';
-import { GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS } from './modelCatalog.js';
+import { GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS, sanitizeGroqModelId } from './modelCatalog.js';
 import { inferTaskKind, isContinuationMessage, isReadOnlyTask } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
 import { assertSafeFilePath } from '../utils/secrets.js';
 import { emitAgentTerminal } from '../utils/terminalBridge.js';
-import { isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
+import { isMac, isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
 
 export interface AgentContext {
 	sessionId: string;
@@ -665,14 +665,22 @@ async function streamCompletion(
 	};
 
 	const providerLabel = config.provider === 'groq' ? 'Groq' : 'Ollama';
+	if (config.provider === 'groq') {
+		config.model = sanitizeGroqModelId(config.model);
+	}
 	const modelCandidates = config.provider === 'groq'
-		? [...new Set([config.model, ...GROQ_MODEL_FALLBACKS, GROQ_FALLBACK_MODEL])]
+		? [...new Set([
+			sanitizeGroqModelId(config.model),
+			...GROQ_MODEL_FALLBACKS.map(sanitizeGroqModelId),
+			GROQ_FALLBACK_MODEL,
+		])]
 		: [config.model];
 
 	let maxTokens = config.provider === 'groq'
 		? Math.min(config.numPredict ?? GROQ_MAX_TOKENS, GROQ_MAX_TOKENS)
 		: (config.numPredict ?? 16384);
 	let lastError = '';
+	let rateLimitRetries = 0;
 
 	for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
 		const modelId = modelCandidates[attempt]!;
@@ -723,10 +731,34 @@ async function streamCompletion(
 			lastError = `${providerLabel} ${res.status}: ${message}`;
 			const modelMissing = res.status === 404
 				|| /does not exist|not found|do not have access|model_not_found/i.test(message);
+			const rateLimited = res.status === 429
+				|| /rate limit|tokens per minute|tpm|try again in/i.test(message);
 			const tooLarge = res.status === 413
-				|| /request too large|tokens per minute|tpm|rate_limit/i.test(message);
-			if (config.provider === 'groq' && (modelMissing || tooLarge) && attempt < modelCandidates.length - 1) {
-				if (tooLarge) maxTokens = GROQ_MAX_TOKENS_RETRY;
+				|| /request too large/i.test(message);
+
+			if (config.provider === 'groq' && rateLimited && rateLimitRetries < 2) {
+				rateLimitRetries += 1;
+				maxTokens = GROQ_MAX_TOKENS_RETRY;
+				const waitMatch = message.match(/try again in\s*([\d.]+)\s*s/i);
+				const waitMs = Math.min(
+					45_000,
+					Math.max(3_000, Math.ceil((waitMatch ? Number(waitMatch[1]) : 8) * 1000) + 500),
+				);
+				callbacks.onThinkingChunk?.(`\n(rate limited — waiting ${Math.ceil(waitMs / 1000)}s, then retrying…)\n`);
+				await new Promise<void>((resolve, reject) => {
+					const t = setTimeout(resolve, waitMs);
+					signal.addEventListener('abort', () => {
+						clearTimeout(t);
+						reject(new DOMException('Aborted', 'AbortError'));
+					}, { once: true });
+				}).catch(() => undefined);
+				if (signal.aborted) return { assistantText: '', toolCalls: new Map() };
+				attempt -= 1; // retry same model
+				continue;
+			}
+
+			if (config.provider === 'groq' && (modelMissing || tooLarge || rateLimited) && attempt < modelCandidates.length - 1) {
+				if (tooLarge || rateLimited) maxTokens = GROQ_MAX_TOKENS_RETRY;
 				continue;
 			}
 			throw new Error(lastError);

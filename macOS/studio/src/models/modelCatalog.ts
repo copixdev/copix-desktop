@@ -61,17 +61,33 @@ export const GROQ_FALLBACK_MODEL = 'llama-3.1-8b-instant';
 /** Vision / image understanding (up to 5 images per request). */
 export const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
-/** Ordered fallbacks when preferred Groq model returns 404 / rate-limit / TPM errors. */
+/** Ordered fallbacks when preferred Groq model returns 404 / rate-limit / TPM errors.
+ * Never include gpt-oss-120b on free tier — 8k TPM causes cascading 429s. */
 export const GROQ_MODEL_FALLBACKS = [
 	'llama-3.3-70b-versatile',
 	'llama-3.1-8b-instant',
-	'openai/gpt-oss-20b',
-	'openai/gpt-oss-120b',
 ] as const;
 
+/** Models that burn free-tier TPM too quickly — remap to a safe default. */
+export const GROQ_BLOCKED_MODELS = [
+	'openai/gpt-oss-120b',
+	'openai/gpt-oss-20b',
+	'gpt-oss-120b',
+	'gpt-oss-20b',
+] as const;
+
+export function sanitizeGroqModelId(modelId: string): string {
+	const id = modelId.trim();
+	if (!id) return GROQ_FALLBACK_MODEL;
+	if (GROQ_BLOCKED_MODELS.some(b => id === b || id.endsWith(`/${b}`) || id.includes('gpt-oss'))) {
+		return 'llama-3.3-70b-versatile';
+	}
+	return id;
+}
+
 /** Free-tier TPM is tight — keep completion budget small so tools+prompt fit. */
-export const GROQ_MAX_TOKENS = 2048;
-export const GROQ_MAX_TOKENS_RETRY = 1024;
+export const GROQ_MAX_TOKENS = 1536;
+export const GROQ_MAX_TOKENS_RETRY = 768;
 
 export function normalizeProvider(provider?: string): ModelProvider {
 	return provider === 'groq' ? 'groq' : 'ollama';

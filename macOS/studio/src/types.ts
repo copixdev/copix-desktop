@@ -44,6 +44,14 @@ export type ModelSelectionMode = 'auto' | 'manual';
 
 export type ModelProvider = 'ollama' | 'groq';
 
+export interface GitHubSettings {
+	enabled?: boolean;
+	username?: string;
+	email?: string;
+	token?: string;
+	mode?: 'off' | 'read' | 'write' | 'pr';
+}
+
 export interface ModelSettings {
 	/** ollama = local (default). groq = free cloud, no model download. */
 	provider?: ModelProvider;
@@ -59,6 +67,7 @@ export interface ModelSettings {
 /** Local app settings — persisted to ~/Copix/settings.json */
 export interface AppSettings {
 	model: ModelSettings;
+	github?: GitHubSettings;
 	layout: LayoutSettings;
 	workspace: WorkspaceSettings;
 	theme: ThemePreference;
@@ -84,6 +93,7 @@ export const DEFAULT_MODEL: ModelSettings = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
 	model: DEFAULT_MODEL,
+	github: { enabled: false, username: '', email: '', token: '', mode: 'pr' },
 	layout: DEFAULT_LAYOUT,
 	workspace: DEFAULT_WORKSPACE,
 	theme: 'dark',

@@ -92,6 +92,79 @@ function readModelSettingsFromDisk(): { provider?: string; apiKey?: string } {
 	}
 }
 
+type GitHubSettingsDisk = {
+	enabled?: boolean;
+	username?: string;
+	email?: string;
+	token?: string;
+	mode?: 'off' | 'read' | 'write' | 'pr';
+};
+
+function readGitHubSettingsFromDisk(): GitHubSettingsDisk {
+	try {
+		const raw = fsSync.readFileSync(settingsPath(), 'utf8');
+		const parsed = JSON.parse(raw) as { github?: GitHubSettingsDisk };
+		return parsed.github ?? {};
+	} catch {
+		return {};
+	}
+}
+
+function sanitizeGitHubSettings(settings?: GitHubSettingsDisk): Required<GitHubSettingsDisk> {
+	return {
+		enabled: Boolean(settings?.enabled),
+		username: settings?.username?.trim() ?? '',
+		email: settings?.email?.trim() ?? '',
+		token: settings?.token?.trim() ?? '',
+		mode: settings?.mode ?? 'pr',
+	};
+}
+
+function isGitHubUrl(url?: string): boolean {
+	return Boolean(url && /github\.com[:/]/i.test(url));
+}
+
+function authCloneUrl(url: string, github: Required<GitHubSettingsDisk>): string {
+	if (!isGitHubUrl(url) || !github.token || !github.username) return url;
+	return url.replace(/^https:\/\//i, `https://${encodeURIComponent(github.username)}:${encodeURIComponent(github.token)}@`);
+}
+
+function ensureAskpassScript(): string {
+	ensureCopixDir();
+	if (process.platform === 'win32') {
+		const file = path.join(copixDir(), 'git-askpass.cmd');
+		if (!fsSync.existsSync(file)) {
+			fsSync.writeFileSync(file, '@echo off\r\nif /I "%1"=="Username for *" echo %COPIX_GITHUB_USERNAME%\r\nif /I not "%1"=="Username for *" echo %COPIX_GITHUB_TOKEN%\r\n', 'utf8');
+		}
+		return file;
+	}
+	const file = path.join(copixDir(), 'git-askpass.sh');
+	if (!fsSync.existsSync(file)) {
+		fsSync.writeFileSync(file, '#!/bin/sh\ncase "$1" in\n  *Username*) printf "%s" "$COPIX_GITHUB_USERNAME" ;;\n  *) printf "%s" "$COPIX_GITHUB_TOKEN" ;;\nesac\n', 'utf8');
+		fsSync.chmodSync(file, 0o700);
+	}
+	return file;
+}
+
+function applyGitHubEnv(base: NodeJS.ProcessEnv, github: Required<GitHubSettingsDisk>): NodeJS.ProcessEnv {
+	if (!github.enabled || !github.token || github.mode === 'off') return base;
+	return {
+		...base,
+		GIT_TERMINAL_PROMPT: '0',
+		GIT_ASKPASS: ensureAskpassScript(),
+		COPIX_GITHUB_USERNAME: github.username || 'x-access-token',
+		COPIX_GITHUB_TOKEN: github.token,
+		...(github.email ? {
+			GIT_AUTHOR_EMAIL: github.email,
+			GIT_COMMITTER_EMAIL: github.email,
+		} : {}),
+		...(github.username ? {
+			GIT_AUTHOR_NAME: 'Copix',
+			GIT_COMMITTER_NAME: 'Copix',
+		} : {}),
+	};
+}
+
 async function fetchGroqStatus(): Promise<{ online: boolean; hasModel: boolean }> {
 	const { apiKey } = readModelSettingsFromDisk();
 	const key = apiKey?.trim();
@@ -376,6 +449,22 @@ async function getGitRemote(workspaceRoot: string): Promise<string | undefined> 
 		let out = '';
 		proc.stdout.on('data', d => { out += d; });
 		proc.on('close', code => resolve(code === 0 ? out.trim() : undefined));
+	});
+}
+
+async function configureGitIdentity(workspaceRoot: string): Promise<void> {
+	const github = sanitizeGitHubSettings(readGitHubSettingsFromDisk());
+	if (!github.enabled || !github.email) return;
+	const env = applyGitHubEnv(terminalEnv(), github);
+	await new Promise<void>(resolve => {
+		const proc = spawn('git', ['config', 'user.name', 'Copix'], { cwd: workspaceRoot, env, shell: true });
+		proc.on('close', () => resolve());
+		proc.on('error', () => resolve());
+	});
+	await new Promise<void>(resolve => {
+		const proc = spawn('git', ['config', 'user.email', github.email], { cwd: workspaceRoot, env, shell: true });
+		proc.on('close', () => resolve());
+		proc.on('error', () => resolve());
 	});
 }
 
@@ -742,10 +831,14 @@ app.whenReady().then(() => {
 		const dest = path.join(parent, name);
 		await fs.mkdir(parent, { recursive: true });
 		if (!fsSync.existsSync(dest)) {
+			const github = sanitizeGitHubSettings(readGitHubSettingsFromDisk());
+			const env = applyGitHubEnv(terminalEnv(), github);
+			const cloneUrl = authCloneUrl(url, github);
 			await new Promise<void>((resolve, reject) => {
-				const proc = spawn('git', ['clone', '--depth', '1', url, dest], { shell: true });
+				const proc = spawn('git', ['clone', '--depth', '1', cloneUrl, dest], { shell: true, env });
 				proc.on('close', code => (code === 0 ? resolve() : reject(new Error('git clone failed'))));
 			});
+			await configureGitIdentity(dest);
 		}
 		return { root: dest, tree: await listTree(dest) };
 	});
@@ -830,6 +923,12 @@ function looksLikeSecretPath(filePath: string): boolean {
 			return msg;
 		}
 
+		const github = sanitizeGitHubSettings(readGitHubSettingsFromDisk());
+		const remote = workspaceRoot ? await getGitRemote(workspaceRoot).catch(() => undefined) : undefined;
+		const env = isGitHubUrl(remote)
+			? applyGitHubEnv(terminalEnv(), github)
+			: terminalEnv();
+
 		return new Promise<string>(resolve => {
 			if (isWin && wantsElevate) {
 				// Elevated PowerShell via UAC; write stdout/stderr to a temp log.
@@ -893,11 +992,11 @@ function looksLikeSecretPath(filePath: string): boolean {
 			const proc = isWin
 				? spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-Command', command], {
 					cwd: workDir,
-					env: terminalEnv(),
+					env,
 				})
 				: spawn(isMac ? '/bin/zsh' : '/bin/bash', ['-lc', command], {
 					cwd: workDir,
-					env: terminalEnv(),
+					env,
 				});
 			let out = '';
 			proc.stdout?.on('data', d => { const s = d.toString(); out += s; emit(s); });

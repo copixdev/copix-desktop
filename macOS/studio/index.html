@@ -6,9 +6,8 @@
   <title>Copix</title>
   <link rel="icon" type="image/png" href="/favicon.png" />
   <script>
-    // Set theme before first paint to avoid a flash (settings may override after mount)
-    document.documentElement.dataset.theme =
-      window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    // Theme is locked to dark
+    document.documentElement.dataset.theme = 'dark';
   </script>
 </head>
 <body>

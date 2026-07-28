@@ -10,7 +10,7 @@ import { SubagentDock } from './components/SubagentDock';
 import { StatusBar } from './components/StatusBar';
 import { ToastProvider } from './components/Toast';
 import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData, ChatSession, titleFromMessage } from './hooks/chatSessions';
-import { DEFAULT_SETTINGS, AppSettings, ThemePreference } from './types';
+import { DEFAULT_SETTINGS, AppSettings } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
 import { normalizeProvider } from './models/modelCatalog';
@@ -19,11 +19,6 @@ import { IconPlus, IconBranch } from './components/Icons';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
 import { subscribeAgentTerminal } from './utils/terminalBridge';
-
-function resolveTheme(pref: ThemePreference, systemLight: boolean): 'light' | 'dark' {
-	if (pref === 'system') return systemLight ? 'light' : 'dark';
-	return pref;
-}
 
 async function ensureWorkspace(session: ChatSession): Promise<ChatSession> {
 	if (session.workspaceRoot) return session;
@@ -54,8 +49,6 @@ function AppInner() {
 	const [panelMode, setPanelMode] = useState<SidePanelMode>('hub');
 	const [reviewFiles, setReviewFiles] = useState<FileChange[] | null>(null);
 	const [paletteOpen, setPaletteOpen] = useState(false);
-	const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
-		resolveTheme('system', window.matchMedia('(prefers-color-scheme: light)').matches));
 
 	const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
 	const workspace = activeSession?.workspaceRoot;
@@ -128,7 +121,7 @@ function AppInner() {
 						? ''
 						: (raw.workspace?.homeDirectory ?? DEFAULT_SETTINGS.workspace.homeDirectory),
 				},
-				theme: raw.theme ?? DEFAULT_SETTINGS.theme,
+				theme: 'dark',
 			});
 			setSettingsReady(true);
 		}).catch(() => setSettingsReady(true));
@@ -136,20 +129,12 @@ function AppInner() {
 
 	useEffect(() => {
 		if (!settingsReady) return;
-		void copix.setSettings(settings);
+		void copix.setSettings({ ...settings, theme: 'dark' });
 	}, [settings, settingsReady]);
 
 	useEffect(() => {
-		const mq = window.matchMedia('(prefers-color-scheme: light)');
-		const apply = () => {
-			const theme = resolveTheme(settings.theme, mq.matches);
-			document.documentElement.dataset.theme = theme;
-			setResolvedTheme(theme);
-		};
-		apply();
-		mq.addEventListener('change', apply);
-		return () => mq.removeEventListener('change', apply);
-	}, [settings.theme]);
+		document.documentElement.dataset.theme = 'dark';
+	}, []);
 
 	useEffect(() => {
 		const poll = () => copix.getServerStatus().then(s => {
@@ -501,7 +486,7 @@ function AppInner() {
 						}}
 						workspace={workspace}
 						tree={tree}
-						theme={resolvedTheme}
+						theme="dark"
 						onNewAgent={handleNewChat}
 						onOpenFolder={async () => {
 							await openFolder();

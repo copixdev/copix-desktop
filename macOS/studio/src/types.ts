@@ -38,7 +38,7 @@ export interface WorkspaceSettings {
 	homeDirectory: string;
 }
 
-export type ThemePreference = 'system' | 'dark' | 'light';
+export type ThemePreference = 'dark';
 
 export type ModelSelectionMode = 'auto' | 'manual';
 
@@ -86,6 +86,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	model: DEFAULT_MODEL,
 	layout: DEFAULT_LAYOUT,
 	workspace: DEFAULT_WORKSPACE,
-	theme: 'system',
+	theme: 'dark',
 	agentMode: 'code',
 };

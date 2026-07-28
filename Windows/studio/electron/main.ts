@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell } from 'electron';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
@@ -434,6 +434,140 @@ border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
 	void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
 
+type MenuAction =
+	| 'new-agent'
+	| 'open-folder'
+	| 'clone-repo'
+	| 'command-palette'
+	| 'toggle-editor'
+	| 'focus-agent';
+
+function sendMenuAction(action: MenuAction): void {
+	const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+	win?.webContents.send('copix:menuAction', action);
+}
+
+function installApplicationMenu(): void {
+	const isMac = process.platform === 'darwin';
+
+	const template: Electron.MenuItemConstructorOptions[] = [
+		...(isMac
+			? [{
+				label: APP_NAME,
+				submenu: [
+					{ role: 'about' as const },
+					{ type: 'separator' as const },
+					{ role: 'services' as const },
+					{ type: 'separator' as const },
+					{ role: 'hide' as const },
+					{ role: 'hideOthers' as const },
+					{ role: 'unhide' as const },
+					{ type: 'separator' as const },
+					{ role: 'quit' as const },
+				],
+			}]
+			: []),
+		{
+			label: 'File',
+			submenu: [
+				{
+					label: 'New Agent',
+					accelerator: 'CmdOrCtrl+N',
+					click: () => sendMenuAction('new-agent'),
+				},
+				{
+					label: 'Open Folder…',
+					accelerator: 'CmdOrCtrl+O',
+					click: () => sendMenuAction('open-folder'),
+				},
+				{
+					label: 'Clone Repository…',
+					click: () => sendMenuAction('clone-repo'),
+				},
+				{ type: 'separator' },
+				isMac ? { role: 'close' } : { role: 'quit' },
+			],
+		},
+		{
+			label: 'Edit',
+			submenu: [
+				{ role: 'undo' },
+				{ role: 'redo' },
+				{ type: 'separator' },
+				{ role: 'cut' },
+				{ role: 'copy' },
+				{ role: 'paste' },
+				...(isMac
+					? [
+						{ role: 'pasteAndMatchStyle' as const },
+						{ role: 'delete' as const },
+						{ role: 'selectAll' as const },
+					]
+					: [
+						{ role: 'delete' as const },
+						{ type: 'separator' as const },
+						{ role: 'selectAll' as const },
+					]),
+				{ type: 'separator' },
+				{
+					label: 'Command Palette…',
+					accelerator: 'CmdOrCtrl+K',
+					click: () => sendMenuAction('command-palette'),
+				},
+			],
+		},
+		{
+			label: 'View',
+			submenu: [
+				{
+					label: 'Toggle Editor Panel',
+					accelerator: 'CmdOrCtrl+B',
+					click: () => sendMenuAction('toggle-editor'),
+				},
+				{
+					label: 'Focus Agent Input',
+					accelerator: 'CmdOrCtrl+L',
+					click: () => sendMenuAction('focus-agent'),
+				},
+				{ type: 'separator' },
+				{ role: 'reload' },
+				{ role: 'forceReload' },
+				{ role: 'toggleDevTools' },
+				{ type: 'separator' },
+				{ role: 'resetZoom' },
+				{ role: 'zoomIn' },
+				{ role: 'zoomOut' },
+				{ type: 'separator' },
+				{ role: 'togglefullscreen' },
+			],
+		},
+		{
+			label: 'Window',
+			submenu: [
+				{ role: 'minimize' },
+				{ role: 'zoom' },
+				...(isMac
+					? [
+						{ type: 'separator' as const },
+						{ role: 'front' as const },
+					]
+					: [{ role: 'close' as const }]),
+			],
+		},
+		{
+			label: 'Help',
+			submenu: [
+				{
+					label: 'Copix on GitHub',
+					click: () => { void shell.openExternal('https://github.com/EJH-BAE/Copix'); },
+				},
+			],
+		},
+	];
+
+	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 function createWindow(): void {
 	const preloadPath = path.join(__dirname, 'preload.mjs');
 	if (!fsSync.existsSync(preloadPath)) {
@@ -523,6 +657,10 @@ async function loadRenderer(): Promise<void> {
 }
 
 app.whenReady().then(() => {
+	// Match locked dark UI — system menu bar / chrome follow dark appearance
+	nativeTheme.themeSource = 'dark';
+	installApplicationMenu();
+
 	ipcMain.handle('copix:getSettings', async () => {
 		try {
 			ensureCopixDir();

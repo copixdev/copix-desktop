@@ -47,6 +47,11 @@ const api = {
 		ipcRenderer.on('copix:pullProgress', handler);
 		return () => { ipcRenderer.removeListener('copix:pullProgress', handler); };
 	},
+	onMenuAction: (cb: (action: string) => void) => {
+		const handler = (_: unknown, action: string) => cb(action);
+		ipcRenderer.on('copix:menuAction', handler);
+		return () => { ipcRenderer.removeListener('copix:menuAction', handler); };
+	},
 };
 
 contextBridge.exposeInMainWorld('copix', api);

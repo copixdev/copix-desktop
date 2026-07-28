@@ -10,12 +10,13 @@ export interface TitleBarMenuActions {
 
 interface Props extends TitleBarMenuActions {}
 
-type MenuId = 'file' | 'edit' | 'view' | 'help' | null;
+type MenuId = 'file' | 'edit' | 'view' | 'window' | 'help' | null;
 
 const MENUS: { id: MenuId; label: string }[] = [
 	{ id: 'file', label: 'File' },
 	{ id: 'edit', label: 'Edit' },
 	{ id: 'view', label: 'View' },
+	{ id: 'window', label: 'Window' },
 	{ id: 'help', label: 'Help' },
 ];
 
@@ -73,6 +74,11 @@ export function TitleBarMenu(props: Props) {
 							{m.id === 'view' && (
 								<>
 									{item('Toggle Editor Panel', props.onToggleEditor)}
+								</>
+							)}
+							{m.id === 'window' && (
+								<>
+									{item('Close Window', () => window.close())}
 								</>
 							)}
 							{m.id === 'help' && (

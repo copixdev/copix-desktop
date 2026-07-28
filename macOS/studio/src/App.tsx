@@ -19,6 +19,7 @@ import { IconPlus, IconBranch } from './components/Icons';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
 import { subscribeAgentTerminal } from './utils/terminalBridge';
+import { isMac } from './utils/platform';
 
 async function ensureWorkspace(session: ChatSession): Promise<ChatSession> {
 	if (session.workspaceRoot) return session;
@@ -335,6 +336,37 @@ function AppInner() {
 
 	const focusComposer = () => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus();
 
+	useEffect(() => {
+		const stop = copix.onMenuAction?.(action => {
+			switch (action) {
+				case 'new-agent':
+					void handleNewChat();
+					break;
+				case 'open-folder':
+					void openFolder();
+					break;
+				case 'clone-repo': {
+					const url = window.prompt('Repository URL to clone');
+					if (url?.trim()) void cloneRepo(url.trim());
+					break;
+				}
+				case 'command-palette':
+					setPaletteOpen(true);
+					break;
+				case 'toggle-editor':
+					setEditorVisible(v => !v);
+					break;
+				case 'focus-agent':
+					focusComposer();
+					break;
+				default:
+					break;
+			}
+		});
+		return () => { stop?.(); };
+		// Menu bridge — rebind when session helpers change
+	}, [activeSessionId, sessions]);
+
 	const paletteCommands: PaletteCommand[] = [
 		{ id: 'new-agent', label: 'New agent', hint: 'Start a fresh conversation', run: handleNewChat },
 		{ id: 'focus-agent', label: 'Focus agent input', hint: 'Ctrl+L', run: focusComposer },
@@ -346,16 +378,18 @@ function AppInner() {
 		<div className="shell">
 			<header className="titlebar">
 				<img src="./favicon.png" alt="" className="titlebar-logo" draggable={false} />
-				<TitleBarMenu
-					onNewAgent={handleNewChat}
-					onOpenFolder={openFolder}
-					onCloneRepo={() => {
-						const url = window.prompt('Repository URL to clone');
-						if (url?.trim()) void cloneRepo(url.trim());
-					}}
-					onToggleEditor={() => setEditorVisible(v => !v)}
-					onOpenPalette={() => setPaletteOpen(true)}
-				/>
+				{!isMac() && (
+					<TitleBarMenu
+						onNewAgent={handleNewChat}
+						onOpenFolder={openFolder}
+						onCloneRepo={() => {
+							const url = window.prompt('Repository URL to clone');
+							if (url?.trim()) void cloneRepo(url.trim());
+						}}
+						onToggleEditor={() => setEditorVisible(v => !v)}
+						onOpenPalette={() => setPaletteOpen(true)}
+					/>
+				)}
 				<span className="titlebar-drag" />
 			</header>
 			<div className="agent-tabs-bar">

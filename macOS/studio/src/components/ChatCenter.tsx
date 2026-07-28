@@ -36,18 +36,16 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconSend, IconPlay, IconCopy, IconImage } from './Icons';
+import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
 import { UserPromptPill } from './UserPromptPill';
 import { FilesChangedCard, type FileChange } from './FilesChangedCard';
-import { collectFileChanges } from '../utils/fileChanges';
+import { collectFileChanges, collectSessionChanges, sumChanges } from '../utils/fileChanges';
 import { chatMessagesToAgentHistory } from '../utils/agentHistory';
 import { AgentWorkflowCard, liveStatusFromActivities } from './AgentWorkflowCard';
 import { ChatActivityList } from './ChatActivityList';
-
-
 
 /** Set true to preview activity rows on the empty chat screen. */
 
@@ -625,6 +623,17 @@ export function ChatCenter({
 			? undefined
 			: streaming || undefined;
 
+	const sessionDiff = useMemo(
+		() => sumChanges(collectSessionChanges(messages)),
+		[messages],
+	);
+	const providerLabel = normalizeProvider(settings.model.provider) === 'groq' ? 'Cloud' : 'Local';
+	const branchLabel = useMemo(() => {
+		if (!workspace) return 'main';
+		const leaf = workspace.replace(/\\/g, '/').split('/').filter(Boolean).pop();
+		return leaf || 'main';
+	}, [workspace]);
+
 	return (
 
 		<div className="chat-center">
@@ -641,6 +650,20 @@ export function ChatCenter({
 					</button>
 				</div>
 			)}
+
+			<div className="chat-stage">
+				{(sessionDiff.added > 0 || sessionDiff.removed > 0) && (
+					<button
+						type="button"
+						className="chat-changes-pill"
+						onClick={() => onReviewFiles?.(collectSessionChanges(messages))}
+						title="Review file changes"
+					>
+						<span className="chat-changes-label">Changes</span>
+						{sessionDiff.added > 0 && <span className="chat-changes-add">+{sessionDiff.added}</span>}
+						{sessionDiff.removed > 0 && <span className="chat-changes-del">−{sessionDiff.removed}</span>}
+					</button>
+				)}
 
 			<div className="chat-stream" ref={listRef} onScroll={() => {
 
@@ -742,19 +765,8 @@ export function ChatCenter({
 
 
 			<div className="composer">
-				<div className="composer-meta">
-					<span className="model-chip" title="Model selection from ~/Copix/settings.json (auto picks by task)">
-						<span className={`chip-dot ${modelReady ? 'on' : ''}`} />
-						<span className="chip-model">{modelChipLabel}</span>
-					</span>
-					<span className="composer-hint">
-						{workspace ? shortPath(workspace) : 'No workspace'}
-					</span>
-					<span className="composer-keys">Paste image · Enter to send · Shift+Enter newline</span>
-				</div>
-
 				<div
-					className={`composer-inner${running ? ' disabled' : ''}`}
+					className={`composer-inner cursor-composer${running ? ' disabled' : ''}`}
 					onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
 					onDrop={e => {
 						e.preventDefault();
@@ -809,104 +821,103 @@ export function ChatCenter({
 					)}
 
 					<div className="composer-row">
-					<textarea
-
-						ref={inputRef}
-
-						className="composer-input"
-
-						placeholder={modelReady ? 'Ask Copix… (@ files, / commands, paste images)' : 'Set up your Copix model to start chatting…'}
-
-						value={input}
-
-						disabled={running || !workspace || !modelReady}
-
-						rows={1}
-
-						onChange={e => {
-
-							setInput(e.target.value);
-							setCaret(e.target.selectionStart);
-							setCmdDismissed(false);
-							setCmdIndex(0);
-
-							e.target.style.height = 'auto';
-
-							e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
-
-						}}
-
-						onClick={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
-
-						onKeyUp={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
-
-						onPaste={handlePaste}
-
-						onKeyDown={e => {
-
-							if (handleCommandMenuKey(
-								e,
-								commandVisible,
-								cmdIndex,
-								commandMenu?.items.length ?? 0,
-								setCmdIndex,
-								() => {
-									if (!commandMenu) return;
-									pickComposerItem(commandMenu, cmdIndex, input, caret, {
-										onSelect: (next, nextCaret) => {
-											setInput(next);
-											setCaret(nextCaret);
-											requestAnimationFrame(() => {
-												const el = inputRef.current;
-												if (el) {
-													el.focus();
-													el.setSelectionRange(nextCaret, nextCaret);
-												}
-											});
-										},
-										onModeChange: setSessionMode,
-										onClose: () => setCmdDismissed(true),
-									});
-								},
-								() => setCmdDismissed(true),
-							)) return;
-
-							if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
-
-						}}
-
-					/>
-
-					<button
-						type="button"
-						className="composer-attach"
-						title="Attach image (or paste / drop)"
-						disabled={running || attachments.length >= 5}
-						onClick={() => fileInputRef.current?.click()}
-					>
-						<IconImage width={16} height={16} />
-					</button>
-
-					<button
-
-						type="button"
-
-						className="composer-send"
-
-						disabled={running || (!input.trim() && !attachments.length) || !modelReady}
-
-						onClick={() => send(input)}
-
-					>
-						{running ? <span className="spinner" /> : <IconSend width={14} height={14} />}
-					</button>
+						<button
+							type="button"
+							className="composer-plus"
+							title="Attach image"
+							disabled={running || attachments.length >= 5}
+							onClick={() => fileInputRef.current?.click()}
+						>
+							<IconPlus width={16} height={16} />
+						</button>
+						<button
+							type="button"
+							className="composer-auto"
+							title="Model selection (edit ~/Copix/settings.json)"
+						>
+							<span>Auto</span>
+							<IconChevron width={11} height={11} style={{ transform: 'rotate(90deg)' }} />
+						</button>
+						<textarea
+							ref={inputRef}
+							className="composer-input"
+							placeholder={modelReady ? 'Ask Copix… (@ files, / commands, paste images)' : 'Set up your Copix model to start chatting…'}
+							value={input}
+							disabled={running || !workspace || !modelReady}
+							rows={1}
+							onChange={e => {
+								setInput(e.target.value);
+								setCaret(e.target.selectionStart);
+								setCmdDismissed(false);
+								setCmdIndex(0);
+								e.target.style.height = 'auto';
+								e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+							}}
+							onClick={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
+							onKeyUp={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
+							onPaste={handlePaste}
+							onKeyDown={e => {
+								if (handleCommandMenuKey(
+									e,
+									commandVisible,
+									cmdIndex,
+									commandMenu?.items.length ?? 0,
+									setCmdIndex,
+									() => {
+										if (!commandMenu) return;
+										pickComposerItem(commandMenu, cmdIndex, input, caret, {
+											onSelect: (next, nextCaret) => {
+												setInput(next);
+												setCaret(nextCaret);
+												requestAnimationFrame(() => {
+													const el = inputRef.current;
+													if (el) {
+														el.focus();
+														el.setSelectionRange(nextCaret, nextCaret);
+													}
+												});
+											},
+											onModeChange: setSessionMode,
+											onClose: () => setCmdDismissed(true),
+										});
+									},
+									() => setCmdDismissed(true),
+								)) return;
+								if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
+							}}
+						/>
+						<button type="button" className="composer-mic" title="Voice input (coming soon)" disabled>
+							<IconMic width={16} height={16} />
+						</button>
+						<button
+							type="button"
+							className="composer-send"
+							disabled={running || (!input.trim() && !attachments.length) || !modelReady}
+							onClick={() => send(input)}
+							title="Send"
+						>
+							{running ? <span className="spinner" /> : <IconArrowUp width={16} height={16} />}
+						</button>
 					</div>
 				</div>
+			</div>
+			</div>
 
-				{liveStatus && (
-					<div className="composer-live-status" aria-live="polite">{liveStatus}</div>
-				)}
-
+			<div className="chat-footer">
+				<span className="chat-footer-item" title={workspace || 'No workspace'}>
+					<IconBranch width={13} height={13} />
+					<span>{branchLabel}</span>
+				</span>
+				<span className="chat-footer-item" title={modelChipLabel}>
+					<IconCloud width={13} height={13} />
+					<span>{providerLabel}</span>
+					<IconChevron width={10} height={10} style={{ transform: 'rotate(90deg)' }} />
+				</span>
+				<span className="chat-footer-spacer" />
+				{running ? <span className="chat-footer-spinner" aria-label="Working" /> : null}
+				{liveStatus && !running ? (
+					<span className="chat-footer-status">{liveStatus}</span>
+				) : null}
 			</div>
 
 		</div>

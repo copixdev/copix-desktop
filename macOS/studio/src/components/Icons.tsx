@@ -188,3 +188,20 @@ export function IconCompose(p: P) {
 		</svg>
 	);
 }
+
+export function IconMic(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<rect x="9" y="3" width="6" height="11" rx="3" />
+			<path d="M5 11a7 7 0 0014 0M12 18v3" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+export function IconArrowUp(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" {...p}>
+			<path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+		</svg>
+	);
+}

@@ -4,7 +4,7 @@ import { copix } from '../api.js';
 import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import type { TaskKind } from './modelCatalog.js';
-import { GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS, sanitizeGroqModelId } from './modelCatalog.js';
+import { GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS, GROQ_VISION_MODEL, sanitizeGroqModelId } from './modelCatalog.js';
 import { inferTaskKind, isContinuationMessage, isReadOnlyTask } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
@@ -388,6 +388,57 @@ function userContentWithImages(text: string, images?: string[]): string | Conten
 	return parts;
 }
 
+function contentPartsToText(content: string | ContentPart[] | null | undefined): string {
+	if (content == null) return '';
+	if (typeof content === 'string') return content;
+	if (!Array.isArray(content)) return String(content);
+	return content
+		.map(part => {
+			if (part.type === 'text') return part.text;
+			if (part.type === 'image_url') return '[image attached]';
+			return '';
+		})
+		.filter(Boolean)
+		.join('\n');
+}
+
+function modelSupportsVision(modelId: string): boolean {
+	return modelId === GROQ_VISION_MODEL || /scout|vision|llava|pixtral/i.test(modelId);
+}
+
+/** Groq rejects non-string content on non-vision models (and null content on tool turns). */
+function normalizeMessagesForModel(messages: ChatMsg[], modelId: string): ChatMsg[] {
+	const allowParts = modelSupportsVision(modelId);
+	return messages.map(m => {
+		let content: string | ContentPart[] = m.content;
+		if (allowParts && Array.isArray(content)) {
+			/* keep multimodal parts */
+		} else {
+			content = contentPartsToText(content);
+		}
+		if (typeof content !== 'string' && !Array.isArray(content)) {
+			content = '';
+		}
+		const next: ChatMsg = { ...m, content };
+		if (m.tool_calls?.length) {
+			next.content = typeof next.content === 'string' ? next.content : contentPartsToText(next.content);
+			next.tool_calls = m.tool_calls.map(tc => ({
+				...tc,
+				function: {
+					name: tc.function.name,
+					arguments: typeof tc.function.arguments === 'string'
+						? tc.function.arguments
+						: JSON.stringify(tc.function.arguments ?? {}),
+				},
+			}));
+		}
+		if (m.role === 'tool') {
+			next.content = contentPartsToText(next.content);
+		}
+		return next;
+	});
+}
+
 export type ToolResultMeta = {
 	result: string;
 	diff?: ReturnType<typeof computeLineDiff>;
@@ -671,6 +722,7 @@ async function streamCompletion(
 	const modelCandidates = config.provider === 'groq'
 		? [...new Set([
 			sanitizeGroqModelId(config.model),
+			...(modelSupportsVision(config.model) ? [GROQ_VISION_MODEL] : []),
 			...GROQ_MODEL_FALLBACKS.map(sanitizeGroqModelId),
 			GROQ_FALLBACK_MODEL,
 		])]
@@ -684,18 +736,19 @@ async function streamCompletion(
 
 	for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
 		const modelId = modelCandidates[attempt]!;
+		const normalizedMessages = normalizeMessagesForModel(messages, modelId);
 		const requestBody = config.provider === 'groq'
 			? {
 				model: modelId,
-				messages,
-				...(opts.tools ? { tools: opts.tools } : {}),
+				messages: normalizedMessages,
+				...(opts.tools ? { tools: opts.tools, parallel_tool_calls: false, tool_choice: 'auto' } : {}),
 				stream: true,
 				temperature: 0.05,
 				max_tokens: maxTokens,
 			}
 			: {
 				model: modelId,
-				messages,
+				messages: normalizedMessages,
 				...(opts.tools ? { tools: opts.tools } : {}),
 				stream: true,
 				temperature: 0.05,
@@ -735,6 +788,8 @@ async function streamCompletion(
 				|| /rate limit|tokens per minute|tpm|try again in/i.test(message);
 			const tooLarge = res.status === 413
 				|| /request too large/i.test(message);
+			const badContent = res.status === 400
+				&& /content must be a string|invalid.*message|only one tool call/i.test(message);
 
 			if (config.provider === 'groq' && rateLimited && rateLimitRetries < 2) {
 				rateLimitRetries += 1;
@@ -757,7 +812,7 @@ async function streamCompletion(
 				continue;
 			}
 
-			if (config.provider === 'groq' && (modelMissing || tooLarge || rateLimited) && attempt < modelCandidates.length - 1) {
+			if (config.provider === 'groq' && (modelMissing || tooLarge || rateLimited || badContent) && attempt < modelCandidates.length - 1) {
 				if (tooLarge || rateLimited) maxTokens = GROQ_MAX_TOKENS_RETRY;
 				continue;
 			}
@@ -823,12 +878,17 @@ function historyToMessages(
 ): ChatMsg[] {
 	const filtered = messages
 		.filter(m => m.role === 'user' || m.role === 'assistant')
-		.map(m => ({
-			role: m.role as 'user' | 'assistant',
-			content: m.content.length > maxChars
-				? `${m.content.slice(0, maxChars)}\n…[truncated]`
-				: m.content,
-		}));
+		.map(m => {
+			const raw = typeof m.content === 'string' ? m.content : String(m.content ?? '');
+			const cleaned = raw.replace(/^__AGENT_ERROR__/, '').trim();
+			return {
+				role: m.role as 'user' | 'assistant',
+				content: cleaned.length > maxChars
+					? `${cleaned.slice(0, maxChars)}\n…[truncated]`
+					: cleaned,
+			};
+		})
+		.filter(m => m.content.length > 0);
 	return filtered.length > maxTurns ? filtered.slice(-maxTurns) : filtered;
 }
 
@@ -945,14 +1005,15 @@ export async function runAgent(
 			hadToolUse = true;
 			callbacks.onClearText?.();
 
-			const calls = [...toolCalls.values()];
+			// Groq free models often allow only one tool call per round
+			const calls = [...toolCalls.values()].slice(0, config.provider === 'groq' ? 1 : undefined);
 			messages.push({
 				role: 'assistant',
-				content: assistantText,
+				content: assistantText || '',
 				tool_calls: calls.map(c => ({
 					id: c.id,
 					type: 'function' as const,
-					function: { name: c.name, arguments: c.args },
+					function: { name: c.name, arguments: c.args || '{}' },
 				})),
 			});
 
@@ -986,7 +1047,12 @@ export async function runAgent(
 					meta = { result: err instanceof Error ? err.message : String(err) };
 				}
 				callbacks.onToolEnd(call.id, normalizeToolName(call.name), args, meta);
-				messages.push({ role: 'tool', content: meta.result, tool_call_id: call.id, name: call.name });
+				messages.push({
+					role: 'tool',
+					content: String(meta.result ?? ''),
+					tool_call_id: call.id,
+					name: call.name,
+				});
 			}
 		} catch (err) {
 			if (signal.aborted) return;

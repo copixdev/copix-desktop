@@ -92,7 +92,7 @@ Never keep re-running the same command.
 
 ### Tool preference
 
-Prefer native **tool_calls** (one tool per round is fine). Use structured JSON only as a last resort.`;
+Prefer native **tool_calls** — **one tool per round**. Use structured JSON only as a last resort.`;
 
 function toolGuidance(readOnly: boolean): string {
 	if (readOnly) {

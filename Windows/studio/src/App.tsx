@@ -386,6 +386,68 @@ function AppInner() {
 		} },
 	];
 
+	const editorPane = (
+		<EditorArea
+			tabs={activeSession?.tabs ?? []}
+			activePath={activeSession?.activePath}
+			fileChanges={displayedFileChanges}
+			mode={bootMode === 'editor' ? 'files' : panelMode}
+			onModeChange={setPanelMode}
+			onSelect={path => patchSession(activeSessionId, { activePath: path })}
+			onClose={path => {
+				const next = (activeSession?.tabs ?? []).filter(t => t.path !== path);
+				patchSession(activeSessionId, {
+					tabs: next,
+					activePath: activeSession?.activePath === path ? next[next.length - 1]?.path : activeSession?.activePath,
+				});
+			}}
+			onChange={(path, content) => {
+				patchSession(activeSessionId, {
+					tabs: (activeSession?.tabs ?? []).map(t => t.path === path ? { ...t, content, dirty: true } : t),
+				});
+			}}
+			onOpenFile={path => {
+				setPanelMode('files');
+				void openFile(path);
+			}}
+			workspace={workspace}
+			tree={tree}
+			theme="dark"
+			onNewAgent={handleNewChat}
+			onOpenFolder={async () => {
+				await openFolder();
+				setPanelMode('files');
+			}}
+			onFocusComposer={focusComposer}
+			onTogglePanel={() => setEditorVisible(v => !v)}
+			onExpandPanel={() => setSettings(prev => ({
+				...prev,
+				layout: { ...prev.layout, editorWidth: 640 },
+			}))}
+		/>
+	);
+
+	if (bootMode === 'editor') {
+		return (
+			<div className="shell ide-shell">
+				<header className={`titlebar${isMac() ? ' titlebar-mac' : ''}`}>
+					{!isMac() && <span className="titlebar-title">Copix IDE</span>}
+					<span className="titlebar-drag" />
+					<span className="titlebar-title">{workspace?.replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'Editor'}</span>
+				</header>
+				<div className="ide-editor-body">
+					{editorPane}
+				</div>
+				<StatusBar
+					workspace={workspace}
+					model={statusBarModel}
+					provider={modelProvider}
+					online={serverOnline}
+				/>
+			</div>
+		);
+	}
+
 	return (
 		<div className="shell">
 			<header className={`titlebar${isMac() ? ' titlebar-mac' : ''}`}>
@@ -475,46 +537,7 @@ function AppInner() {
 					/>
 					</div>
 				}
-				editor={
-					<EditorArea
-						tabs={activeSession?.tabs ?? []}
-						activePath={activeSession?.activePath}
-						fileChanges={displayedFileChanges}
-						mode={panelMode}
-						onModeChange={setPanelMode}
-						onSelect={path => patchSession(activeSessionId, { activePath: path })}
-						onClose={path => {
-							const next = (activeSession?.tabs ?? []).filter(t => t.path !== path);
-							patchSession(activeSessionId, {
-								tabs: next,
-								activePath: activeSession?.activePath === path ? next[next.length - 1]?.path : activeSession?.activePath,
-							});
-						}}
-						onChange={(path, content) => {
-							patchSession(activeSessionId, {
-								tabs: (activeSession?.tabs ?? []).map(t => t.path === path ? { ...t, content, dirty: true } : t),
-							});
-						}}
-						onOpenFile={path => {
-							setPanelMode('files');
-							void openFile(path);
-						}}
-						workspace={workspace}
-						tree={tree}
-						theme="dark"
-						onNewAgent={handleNewChat}
-						onOpenFolder={async () => {
-							await openFolder();
-							setPanelMode('files');
-						}}
-						onFocusComposer={focusComposer}
-						onTogglePanel={() => setEditorVisible(v => !v)}
-						onExpandPanel={() => setSettings(prev => ({
-							...prev,
-							layout: { ...prev.layout, editorWidth: 640 },
-						}))}
-					/>
-				}
+				editor={editorPane}
 				/>
 			</div>
 

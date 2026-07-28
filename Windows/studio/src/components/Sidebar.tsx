@@ -255,10 +255,10 @@ export function Sidebar({
 					type="button"
 					className="sidebar-action"
 					onClick={() => setShowClone(v => !v)}
-					title="Sync a GitHub repository"
+					title="Clone a repository"
 				>
 					<IconRobot width={15} height={15} />
-					<span>GitHub Sync</span>
+					<span>Clone Repo</span>
 				</button>
 				<button type="button" className="sidebar-action" onClick={() => void openCustomize()}>
 					<IconLayout width={15} height={15} />

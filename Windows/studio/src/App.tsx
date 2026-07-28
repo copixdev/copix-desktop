@@ -26,6 +26,10 @@ async function ensureWorkspace(session: ChatSession): Promise<ChatSession> {
 }
 
 function AppInner() {
+	const bootMode = useMemo(
+		() => new URLSearchParams(window.location.search).get('mode'),
+		[],
+	);
 	const [sessions, setSessions] = useState<ChatSession[]>(() => {
 		const wipeKey = 'copix.agents.wiped.v2026-07-11';
 		if (!localStorage.getItem(wipeKey)) {
@@ -82,6 +86,14 @@ function AppInner() {
 			}
 		});
 	}, []);
+
+	useEffect(() => {
+		if (bootMode === 'editor') {
+			setEditorVisible(true);
+			setPanelMode('files');
+			setSettings(prev => ({ ...prev, layout: { ...prev.layout, editorWidth: 640 } }));
+		}
+	}, [bootMode]);
 
 	useEffect(() => { saveSessions(sessions); }, [sessions]);
 
@@ -368,8 +380,8 @@ function AppInner() {
 		{ id: 'focus-agent', label: 'Focus Agent Input', hint: 'Ctrl+L', category: 'actions', run: focusComposer },
 		{ id: 'toggle-editor', label: editorVisible ? 'Hide Editor Panel' : 'Show Editor Panel', hint: 'Ctrl+B', category: 'actions', run: () => setEditorVisible(v => !v) },
 		{ id: 'open-folder', label: 'Open Folder…', hint: 'Files', category: 'files', run: openFolder },
-		{ id: 'github-sync', label: 'GitHub Sync…', hint: 'Clone a GitHub repository', category: 'settings', run: () => {
-			const url = window.prompt('GitHub repository URL');
+		{ id: 'clone-repo', label: 'Clone Repository…', hint: 'Git URL', category: 'files', run: () => {
+			const url = window.prompt('Repository URL');
 			if (url?.trim()) void cloneRepo(url.trim());
 		} },
 	];
@@ -444,10 +456,6 @@ function AppInner() {
 							setReviewFiles(files);
 							setEditorVisible(true);
 							setPanelMode('changes');
-						}}
-						onGitHubSync={() => {
-							const url = window.prompt('GitHub repository URL');
-							if (url?.trim()) void cloneRepo(url.trim());
 						}}
 						onSpawnSubagent={handleSpawnSubagent}
 						pendingPrompt={activeSession?.pendingPrompt}

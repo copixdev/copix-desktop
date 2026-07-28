@@ -75,7 +75,6 @@ interface Props {
 	onReviewFiles?: (files: FileChange[]) => void;
 
 	onSpawnSubagent?: (prompt: string, label?: string) => Promise<{ sessionId: string }>;
-	onGitHubSync?: () => void;
 
 	pendingPrompt?: string;
 
@@ -177,7 +176,7 @@ function AssistantTurn({
 export function ChatCenter({
 
 	sessionId, workspace, workspaceEnv, settings, messages, onMessagesChange, onWorkspaceChange,
-	tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, onGitHubSync, pendingPrompt, onPendingPromptConsumed,
+	tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
 
 }: Props) {
 
@@ -738,18 +737,15 @@ export function ChatCenter({
 						<div className="startup-badges">
 							<span className="startup-badge">{branchLabel === 'main' ? 'copix' : branchLabel}</span>
 							<span className="startup-badge">{branchLabel}</span>
-							<span className="startup-badge">
-								<IconCloud width={12} height={12} />
-								{locationLabel}
-							</span>
+							<span className="startup-badge">{locationLabel}</span>
 						</div>
 
 						<div className="startup-card">
 							<p className="startup-placeholder">Plan, Build, / for skills, @ for context</p>
 							<div className="startup-actions">
-								<button type="button" className="startup-chip primary" onClick={onGitHubSync}>
-									<IconCloud width={13} height={13} />
-									GitHub Sync
+								<button type="button" className="startup-chip primary" onClick={() => { void window.copix?.openIdeWindow?.(); }}>
+									<IconExpand width={13} height={13} />
+									Open Editor
 								</button>
 								<button
 									type="button"

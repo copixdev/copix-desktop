@@ -589,7 +589,7 @@ function installApplicationMenu(): void {
 	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function createAppWindow(): BrowserWindow {
+function createAppWindow(mode?: 'editor'): BrowserWindow {
 	const preloadPath = path.join(__dirname, 'preload.mjs');
 	if (!fsSync.existsSync(preloadPath)) {
 		console.error('[copix] Preload script missing:', preloadPath);
@@ -627,7 +627,7 @@ function createAppWindow(): BrowserWindow {
 	showLoadingPage(win);
 	win.once('ready-to-show', () => win.show());
 
-	void loadRenderer(win).catch(err => {
+	void loadRenderer(win, mode).catch(err => {
 		console.error('[copix] loadRenderer failed:', err);
 	});
 	return win;
@@ -637,7 +637,7 @@ function createWindow(): void {
 	mainWindow = createAppWindow();
 }
 
-async function loadRenderer(win: BrowserWindow): Promise<void> {
+async function loadRenderer(win: BrowserWindow, mode?: 'editor'): Promise<void> {
 	if (!win) return;
 
 	const distIndex = path.join(__dirname, '../dist/index.html');
@@ -647,7 +647,8 @@ async function loadRenderer(win: BrowserWindow): Promise<void> {
 
 	if (devUrl) {
 		try {
-			await win.loadURL(devUrl);
+			const url = mode === 'editor' ? `${devUrl}${devUrl.includes('?') ? '&' : '?'}mode=editor` : devUrl;
+			await win.loadURL(url);
 			win.webContents.openDevTools({ mode: 'detach' });
 			console.log('[copix] Loaded dev URL:', devUrl);
 		} catch (err) {
@@ -659,7 +660,8 @@ async function loadRenderer(win: BrowserWindow): Promise<void> {
 
 	if (fsSync.existsSync(distIndex)) {
 		try {
-			await win.loadFile(distIndex);
+			if (mode === 'editor') await win.loadFile(distIndex, { search: '?mode=editor' });
+			else await win.loadFile(distIndex);
 			console.log('[copix] Loaded production build:', distIndex);
 		} catch (err) {
 			console.error('[copix] loadFile failed:', distIndex, err);
@@ -915,7 +917,7 @@ function looksLikeSecretPath(filePath: string): boolean {
 
 	ipcMain.handle('copix:openExternal', (_e, url: string) => shell.openExternal(url));
 	ipcMain.handle('copix:openIdeWindow', () => {
-		createAppWindow();
+		createAppWindow('editor');
 		return { ok: true };
 	});
 

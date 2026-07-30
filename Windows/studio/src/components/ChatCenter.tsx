@@ -34,7 +34,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconFile, IconBrain, IconCommand, IconLink, IconSliders, IconPaperclip, IconHexagon, IconBook, IconHelp, IconWrench } from './Icons';
+import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconLink, IconSliders, IconPaperclip, IconHexagon, IconBook, IconHelp, IconWrench } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode, WorkspaceEnvironment } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';

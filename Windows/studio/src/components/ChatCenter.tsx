@@ -34,7 +34,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconLink, IconSliders, IconPaperclip, IconHexagon, IconBook, IconHelp, IconWrench } from './Icons';
+import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconSliders, IconPaperclip, IconHexagon, IconHelp, IconWrench } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode, WorkspaceEnvironment } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
@@ -42,7 +42,8 @@ import { UserPromptPill } from './UserPromptPill';
 import { FilesChangedCard, type FileChange } from './FilesChangedCard';
 import { collectFileChanges, collectSessionChanges, sumChanges } from '../utils/fileChanges';
 import { chatMessagesToAgentHistory } from '../utils/agentHistory';
-import { AgentWorkflowCard, liveStatusFromActivities } from './AgentWorkflowCard';
+import { ModelPickerMenu } from './ModelPickerMenu';
+import type { ModelSettings } from '../types';
 
 interface Props {
 
@@ -58,6 +59,8 @@ interface Props {
 	onMessagesChange: (msgs: ChatMessage[], title?: string) => void;
 
 	onWorkspaceChange: (root: string) => void;
+
+	onModelSettingsChange?: (model: ModelSettings) => void;
 
 	tree?: string[];
 
@@ -167,7 +170,7 @@ function AssistantTurn({
 export function ChatCenter({
 
 	sessionId, workspace, workspaceEnv, settings, messages, onMessagesChange, onWorkspaceChange,
-	tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
+	onModelSettingsChange, tree = [], onOpenFile, onReviewFiles, onSpawnSubagent, pendingPrompt, onPendingPromptConsumed,
 
 }: Props) {
 
@@ -210,6 +213,7 @@ export function ChatCenter({
 	const autoFollowRef = useRef(true);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const plusMenuRef = useRef<HTMLDivElement>(null);
+	const autoMenuRef = useRef<HTMLDivElement>(null);
 
 	const commandMenu = useComposerCommands(input, caret, tree);
 	const commandVisible = Boolean(commandMenu && commandMenu.items.length && !cmdDismissed);
@@ -218,6 +222,8 @@ export function ChatCenter({
 
 	const [sessionMode, setSessionMode] = useState<AgentMode | null>(null);
 	const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+	const [modelMenuOpen, setModelMenuOpen] = useState(false);
+	const [modelMenuSource, setModelMenuSource] = useState<'auto' | 'plus'>('auto');
 	const agentMode = sessionMode ?? settings.agentMode;
 
 	const config = useMemo(
@@ -275,13 +281,16 @@ export function ChatCenter({
 	}, [sessionId]);
 
 	useEffect(() => {
-		if (!plusMenuOpen) return;
+		if (!plusMenuOpen && !modelMenuOpen) return;
 		const onDoc = (e: MouseEvent) => {
-			if (!plusMenuRef.current?.contains(e.target as Node)) setPlusMenuOpen(false);
+			const t = e.target as Node;
+			if (plusMenuRef.current?.contains(t) || autoMenuRef.current?.contains(t)) return;
+			setPlusMenuOpen(false);
+			setModelMenuOpen(false);
 		};
 		document.addEventListener('mousedown', onDoc);
 		return () => document.removeEventListener('mousedown', onDoc);
-	}, [plusMenuOpen]);
+	}, [plusMenuOpen, modelMenuOpen]);
 
 	// Blank slate when switching agents — abort in-flight work and clear local UI state.
 	useEffect(() => {
@@ -862,38 +871,60 @@ export function ChatCenter({
 											<span>Files</span>
 										</span>
 									</button>
-									<button type="button" className="composer-plus-entry">
+									<button
+										type="button"
+										className="composer-plus-entry"
+										onClick={() => {
+											setPlusMenuOpen(false);
+											setModelMenuSource('plus');
+											setModelMenuOpen(true);
+										}}
+									>
 										<span className="composer-plus-entry-left">
 											<IconHexagon width={15} height={15} />
 											<span>Models</span>
 										</span>
 										<IconChevron width={12} height={12} />
 									</button>
-									<button type="button" className="composer-plus-entry">
-										<span className="composer-plus-entry-left">
-											<IconBook width={15} height={15} />
-											<span>Skills</span>
-										</span>
-										<IconChevron width={12} height={12} />
-									</button>
-									<button type="button" className="composer-plus-entry">
-										<span className="composer-plus-entry-left">
-											<IconLink width={15} height={15} />
-											<span>MCP Servers</span>
-										</span>
-										<IconChevron width={12} height={12} />
-									</button>
 								</div>
 							)}
+							{modelMenuOpen && modelMenuSource === 'plus' && (
+								<ModelPickerMenu
+									settings={settings.model}
+									installed={server.models}
+									className="model-picker-from-plus"
+									onChange={model => onModelSettingsChange?.(model)}
+									onClose={() => setModelMenuOpen(false)}
+								/>
+							)}
 						</div>
-						<button
-							type="button"
-							className="composer-auto"
-							title="Model selection (edit ~/Copix/settings.json)"
-						>
-							<span>Auto</span>
-							<IconChevron width={11} height={11} style={{ transform: 'rotate(90deg)' }} />
-						</button>
+						<div className="composer-auto-wrap" ref={autoMenuRef}>
+							<button
+								type="button"
+								className={`composer-auto${modelMenuOpen && modelMenuSource === 'auto' ? ' open' : ''}`}
+								title="Select model"
+								onClick={() => {
+									setPlusMenuOpen(false);
+									if (modelMenuOpen && modelMenuSource === 'auto') {
+										setModelMenuOpen(false);
+										return;
+									}
+									setModelMenuSource('auto');
+									setModelMenuOpen(true);
+								}}
+							>
+								<span>{settings.model.selection === 'manual' ? (modelChipLabel.replace(/^auto · /, '') || 'Model') : 'Auto'}</span>
+								<IconChevron width={11} height={11} style={{ transform: 'rotate(90deg)' }} />
+							</button>
+							{modelMenuOpen && modelMenuSource === 'auto' && (
+								<ModelPickerMenu
+									settings={settings.model}
+									installed={server.models}
+									onChange={model => onModelSettingsChange?.(model)}
+									onClose={() => setModelMenuOpen(false)}
+								/>
+							)}
+						</div>
 						<textarea
 							ref={inputRef}
 							className="composer-input"

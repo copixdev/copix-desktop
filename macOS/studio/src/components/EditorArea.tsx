@@ -72,7 +72,7 @@ export function EditorArea({
 }: Props) {
 	const [mode, setMode] = useState<SidePanelMode>(modeProp ?? (tabs.length ? 'files' : 'hub'));
 	const [openTabs, setOpenTabs] = useState<OpenableMode[]>(() =>
-		modeProp && modeProp !== 'hub' ? [modeProp] : tabs.length ? ['files'] : ['browser'],
+		modeProp && modeProp !== 'hub' ? [modeProp] : tabs.length ? ['files'] : [],
 	);
 	const [plusOpen, setPlusOpen] = useState(false);
 	const [plusQuery, setPlusQuery] = useState('');
@@ -119,11 +119,10 @@ export function EditorArea({
 	const menuItems = useMemo(() => {
 		const q = plusQuery.trim().toLowerCase();
 		const items = [
-			{ id: 'files' as const, label: 'File', hint: '⌘G', Icon: IconFile },
-			{ id: 'terminal' as const, label: 'Terminal', hint: '⌘J', Icon: IconTerminal },
-			{ id: 'browser' as const, label: 'Browser', hint: '⇧⌘B', Icon: IconGlobe },
-			{ id: 'files' as const, label: 'Desktop', hint: '', Icon: IconFile },
-			{ id: 'browser' as const, label: 'Canvas', hint: '', Icon: IconGlobe },
+			{ key: 'file', id: 'files' as const, label: 'File', hint: '⌘G', Icon: IconFile },
+			{ key: 'terminal', id: 'terminal' as const, label: 'Terminal', hint: '⌘J', Icon: IconTerminal },
+			{ key: 'browser', id: 'browser' as const, label: 'Browser', hint: '⇧⌘B', Icon: IconGlobe },
+			{ key: 'changes', id: 'changes' as const, label: 'Changes', hint: '', Icon: IconBranch },
 		];
 		return items.filter(d => !q || d.label.toLowerCase().includes(q));
 	}, [plusQuery]);
@@ -132,29 +131,31 @@ export function EditorArea({
 		<div className="editor-shell side-panel">
 			<div className="side-panel-toolbar panel-tabbar">
 				<div className="side-panel-tabs">
-					{openTabs.map(id => {
-						const def = PANEL_DEFS.find(d => d.id === id)!;
-						const label = panelLabel(id);
-						return (
-							<div key={id} className={`panel-tab${mode === id ? ' active' : ''}`}>
-								<button type="button" className="panel-tab-main" onClick={() => go(id)}>
-									<def.Icon width={13} height={13} />
-									<span>{label}</span>
-								</button>
-								<button
-									type="button"
-									className="panel-tab-x"
-									title={`Close ${label}`}
-									onClick={e => {
-										e.stopPropagation();
-										closeTab(id);
-									}}
-								>
-									<IconX width={10} height={10} />
-								</button>
-							</div>
-						);
-					})}
+					<div className="side-panel-tabs-scroll">
+						{openTabs.map(id => {
+							const def = PANEL_DEFS.find(d => d.id === id)!;
+							const label = panelLabel(id);
+							return (
+								<div key={id} className={`panel-tab${mode === id ? ' active' : ''}`}>
+									<button type="button" className="panel-tab-main" onClick={() => go(id)}>
+										<def.Icon width={13} height={13} />
+										<span>{label}</span>
+									</button>
+									<button
+										type="button"
+										className="panel-tab-x"
+										title={`Close ${label}`}
+										onClick={e => {
+											e.stopPropagation();
+											closeTab(id);
+										}}
+									>
+										<IconX width={10} height={10} />
+									</button>
+								</div>
+							);
+						})}
+					</div>
 					<div className="panel-plus-wrap" ref={plusRef}>
 						<button
 							type="button"
@@ -172,10 +173,16 @@ export function EditorArea({
 									value={plusQuery}
 									autoFocus
 									onChange={e => setPlusQuery(e.target.value)}
+									onKeyDown={e => {
+										if (e.key === 'Escape') {
+											setPlusOpen(false);
+											setPlusQuery('');
+										}
+									}}
 								/>
 								{menuItems.map(item => (
 									<button
-										key={item.id}
+										key={item.key}
 										type="button"
 										className={`panel-plus-item${mode === item.id ? ' active' : ''}`}
 										onClick={() => {
@@ -190,6 +197,9 @@ export function EditorArea({
 										{item.hint && <span className="panel-plus-item-hint">{item.hint}</span>}
 									</button>
 								))}
+								{!menuItems.length && (
+									<div className="panel-plus-empty">No matching panels</div>
+								)}
 							</div>
 						)}
 					</div>

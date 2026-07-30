@@ -522,6 +522,7 @@ function AppInner() {
 						onSpawnSubagent={handleSpawnSubagent}
 						pendingPrompt={activeSession?.pendingPrompt}
 						onPendingPromptConsumed={() => patchSession(activeSessionId, { pendingPrompt: undefined })}
+						onModelSettingsChange={model => setSettings(prev => ({ ...prev, model }))}
 					/>
 					<SubagentDock
 						sessions={subagentSessions}

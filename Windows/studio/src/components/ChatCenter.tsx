@@ -650,11 +650,9 @@ export function ChatCenter({
 		requestAnimationFrame(() => inputRef.current?.focus());
 	};
 
-	const isStartup = !messages.length && !streaming && !running;
-
 	return (
 
-		<div className={`chat-center${isStartup ? ' is-startup' : ''}`}>
+		<div className="chat-center">
 
 			{!modelReady && (
 				<div className="banner banner-warn">
@@ -760,7 +758,6 @@ export function ChatCenter({
 
 
 
-			{!isStartup && (
 			<div className="composer">
 				<div
 					className={`composer-inner cursor-composer${running ? ' disabled' : ''}`}
@@ -971,7 +968,6 @@ export function ChatCenter({
 					</div>
 				</div>
 			</div>
-			)}
 			</div>
 
 			<div className="chat-footer">

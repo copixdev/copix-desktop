@@ -117,7 +117,9 @@ function AssistantTurn({
 		? content!.replace(/^\*\*Error:\*\*\s*/, '').replace(/^__AGENT_ERROR__/, '')
 		: '';
 
-	const showContent = Boolean(content && content !== '(done)' && !isError);
+	const isPlaceholder = content === '(done)' || content === '(No response from model)';
+	const showContent = Boolean(content && !isPlaceholder && !isError);
+	const showPlaceholder = Boolean(isPlaceholder && !(activities?.some(a => a.kind !== 'think') ?? false));
 
 	const copyReply = () => {
 		if (!content || isError || content === '(done)' || !showContent) return;
@@ -146,7 +148,12 @@ function AssistantTurn({
 							<MarkdownMessage content={content!} />
 						</div>
 					)}
-					{!live && !isError && (showContent || (activities?.length ?? 0) > 0) && (
+					{showPlaceholder && (
+						<div className="msg-body assistant muted">
+							<p className="assistant-empty">No response from the model. Check Groq/Ollama status and try again.</p>
+						</div>
+					)}
+					{!live && !isError && (showContent || showPlaceholder || (activities?.length ?? 0) > 0) && (
 						<div className="msg-footer">
 							{timestamp != null && <span className="msg-time">{relativeTime(timestamp)}</span>}
 							{showContent && (
@@ -206,6 +213,9 @@ export function ChatCenter({
 
 	const abortRef = useRef<AbortController | null>(null);
 	const pendingPromptSentRef = useRef(false);
+	const sendGenRef = useRef(0);
+	const messagesRef = useRef(messages);
+	messagesRef.current = messages;
 
 	const listRef = useRef<HTMLDivElement>(null);
 
@@ -355,6 +365,9 @@ export function ChatCenter({
 
 		}
 
+		const sendGen = ++sendGenRef.current;
+		const isStale = () => sendGen !== sendGenRef.current;
+
 
 
 		setInput('');
@@ -371,7 +384,7 @@ export function ChatCenter({
 
 
 		const userMsg: ChatMessage = {
-			id: `u-${Date.now()}`,
+			id: `u-${Date.now()}-${sendGen}`,
 			role: 'user',
 			content: msg,
 			images: images.length ? [...images] : undefined,
@@ -380,7 +393,7 @@ export function ChatCenter({
 
 		const agentMsg = msg;
 
-		const nextMessages = [...messages, userMsg];
+		const nextMessages = [...messagesRef.current, userMsg];
 
 		onMessagesChange(nextMessages, titleFromMessage(msg || 'Image'));
 
@@ -388,11 +401,12 @@ export function ChatCenter({
 
 		abortRef.current?.abort();
 
-		abortRef.current = new AbortController();
+		const ac = new AbortController();
+		abortRef.current = ac;
 
 		let buf = '';
 
-		const aid = `a-${Date.now()}`;
+		const aid = `a-${Date.now()}-${sendGen}`;
 
 		let structuredActions: AgentAction[] | undefined;
 
@@ -407,6 +421,9 @@ export function ChatCenter({
 				msg,
 				{ hasImages: images.length > 0 },
 			);
+			if (runConfig.provider === 'groq' && !runConfig.apiKey) {
+				throw new Error('Groq API key missing — add model.apiKey in ~/Copix/settings.json');
+			}
 			const taskKind = inferTaskKind(msg, agentMode);
 
 			await runAgent(
@@ -420,13 +437,13 @@ export function ChatCenter({
 					onSpawnSubagent,
 				},
 
-				chatMessagesToAgentHistory(messages),
+				chatMessagesToAgentHistory(messagesRef.current.filter(m => m.id !== userMsg.id)),
 
-				abortRef.current.signal,
+				ac.signal,
 
 				{
 
-					onText: c => { buf += c; setStreaming(buf); },
+					onText: c => { buf += c; if (!isStale()) setStreaming(buf); },
 
 					onThinkingStart: () => {
 
@@ -466,27 +483,27 @@ export function ChatCenter({
 						const label = formatActivityDisplay(act);
 						const statusText = [label.verb, label.target].filter(Boolean).join(' ')
 							+ (label.ellipsis ? '...' : '');
-						setStatus(statusText);
+						if (!isStale()) setStatus(statusText);
 					},
 
 					onToolEnd: (callId, _tool, _args, meta) => {
 						patchActivities(p => p.map(a => a.id === callId
 							? finalizeToolActivity(a, { result: meta.result, diff: meta.diff })
 							: a));
-						setStatus('');
+						if (!isStale()) setStatus('');
 					},
 
-					onStatus: setStatus,
+					onStatus: msg => { if (!isStale()) setStatus(msg); },
 
 					onStructuredResponse: parsed => {
 						buf = parsed.message;
 						structuredActions = parsed.actions.length ? parsed.actions : undefined;
-						setStreaming(parsed.message);
+						if (!isStale()) setStreaming(parsed.message);
 					},
 
 					onClearText: () => {
 						buf = '';
-						setStreaming('');
+						if (!isStale()) setStreaming('');
 					},
 
 				},
@@ -495,10 +512,14 @@ export function ChatCenter({
 
 			);
 
+			if (isStale() || ac.signal.aborted) return;
+
 			const turnActivities = activitiesRef.current.length ? [...activitiesRef.current] : undefined;
 
 			const reply = buf.trim();
-			const hasActivities = Boolean(turnActivities?.length);
+			const hasToolWork = Boolean(turnActivities?.some(a => a.kind !== 'think'));
+			const content = reply
+				|| (hasToolWork ? '' : '(No response from model)');
 
 			onMessagesChange([...nextMessages, {
 
@@ -506,7 +527,7 @@ export function ChatCenter({
 
 				role: 'assistant',
 
-				content: reply || (hasActivities ? '' : '(done)'),
+				content,
 
 				timestamp: Date.now(),
 
@@ -524,6 +545,11 @@ export function ChatCenter({
 			patchActivities(() => []);
 
 		} catch (err) {
+
+			if (isStale()) return;
+			if (ac.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+				return;
+			}
 
 			const e = err instanceof Error ? err.message : String(err);
 
@@ -558,9 +584,10 @@ export function ChatCenter({
 
 		} finally {
 
-			setRunning(false);
-
-			setStatus('');
+			if (!isStale()) {
+				setRunning(false);
+				setStatus('');
+			}
 
 		}
 

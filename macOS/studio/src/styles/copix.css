@@ -1051,7 +1051,13 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	padding: 10px 14px;
 	white-space: pre-wrap;
 }
-.msg-body.assistant { padding: 2px 0; }
+.msg-body.assistant.muted { color: #8b8b93; }
+.assistant-empty {
+	margin: 0;
+	font-size: 12.5px;
+	line-height: 1.45;
+	color: #8b8b93;
+}
 
 /* Cursor-style user prompt pill in stream */
 .user-prompt-pill {

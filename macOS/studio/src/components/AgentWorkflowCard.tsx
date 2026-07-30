@@ -26,10 +26,6 @@ export function AgentWorkflowCard({ activities, expanded, onToggle, live }: Prop
 		? [activeLabel.verb, activeLabel.target].filter(Boolean).join(' ') + (activeLabel.ellipsis ? '…' : '')
 		: '';
 
-	const thoughtLine = isVisibleThought(active) || isVisibleThought(activities.find(a => a.kind === 'think'))
-		? (summary.thoughtSec != null ? `Thought for ${summary.thoughtSec}s` : (live ? 'Rate limited…' : null))
-		: null;
-
 	const statsLine = [
 		summary.reads ? `Explored ${summary.reads} file${summary.reads === 1 ? '' : 's'}` : '',
 		summary.searches ? `${summary.searches} search${summary.searches === 1 ? '' : 'es'}` : '',
@@ -38,6 +34,12 @@ export function AgentWorkflowCard({ activities, expanded, onToggle, live }: Prop
 	].filter(Boolean).join(', ');
 
 	const addedLines = activities.reduce((n, a) => n + (a.diff?.added ?? 0), 0);
+
+	const thoughtLine = isVisibleThought(active) || isVisibleThought(activities.find(a => a.kind === 'think'))
+		? (summary.thoughtSec != null ? `Thought for ${summary.thoughtSec}s` : (live ? 'Rate limited…' : null))
+		: (!live && summary.thoughtSec != null && !summary.headline && !statsLine && addedLines === 0
+			? `Thought for ${summary.thoughtSec}s`
+			: null);
 
 	return (
 		<div className={`workflow-card${expanded ? ' open' : ''}${live ? ' live' : ''}`}>

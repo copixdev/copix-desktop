@@ -949,7 +949,7 @@ export async function runAgent(
 			const round = await streamCompletion(messages, config, signal, callbacks, { tools: activeTools });
 			const { assistantText, toolCalls } = round;
 
-			if (!toolCalls.size) {
+				if (!toolCalls.size) {
 				const parsed = parseStructuredResponse(assistantText);
 				if (parsed) {
 					const displayMessage = parsed.message || '(executed actions)';
@@ -981,7 +981,20 @@ export async function runAgent(
 						messages.push({ role: 'user', content: CONTINUE_USER_PROMPT });
 						continue;
 					}
-					break;
+					callbacks.onText('Finished tool work, but the model returned no final message. Ask me to continue if needed.');
+					callbacks.onStatus('');
+					return;
+				}
+				if (!assistantText.trim() && !hadToolUse) {
+					if (emptyReplyRetries < MAX_EMPTY_REPLY_RETRIES) {
+						emptyReplyRetries++;
+						messages.push({
+							role: 'user',
+							content: 'Please respond with either a tool call or a short chat message. Do not return an empty reply.',
+						});
+						continue;
+					}
+					throw new Error(`${config.provider === 'groq' ? 'Groq' : 'Ollama'} returned an empty reply. Try again or pick another model.`);
 				}
 				if (
 					!isReadOnlyTask(taskKind)

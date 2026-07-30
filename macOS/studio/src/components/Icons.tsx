@@ -205,3 +205,47 @@ export function IconArrowUp(p: P) {
 		</svg>
 	);
 }
+
+export function IconPaperclip(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<path d="M21.4 11.6l-9.2 9.2a6 6 0 01-8.5-8.5l9.2-9.2a4 4 0 015.7 5.7L9.5 18a2 2 0 01-2.8-2.8l8.1-8.1" strokeLinecap="round" strokeLinejoin="round" />
+		</svg>
+	);
+}
+
+export function IconHexagon(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" strokeLinejoin="round" />
+		</svg>
+	);
+}
+
+export function IconBook(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<path d="M4 19.5A2.5 2.5 0 016.5 17H20" strokeLinecap="round" />
+			<path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" strokeLinejoin="round" />
+		</svg>
+	);
+}
+
+export function IconHelp(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4.5" strokeLinecap="round" />
+			<circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none" />
+		</svg>
+	);
+}
+
+export function IconWrench(p: P) {
+	return (
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" {...p}>
+			<path d="M14.7 6.3a4 4 0 015 5l-7.1 7.1a2 2 0 01-2.8 0L8 16.6l-.7.7a1 1 0 01-1.4 0L4.2 15.6a1 1 0 010-1.4l.7-.7-1.7-1.7a2 2 0 010-2.8l1.4-1.4 7.1 7.1" strokeLinecap="round" strokeLinejoin="round" />
+			<path d="M16 8l2.5-2.5" strokeLinecap="round" />
+		</svg>
+	);
+}

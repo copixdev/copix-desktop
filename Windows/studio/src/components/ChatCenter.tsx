@@ -34,7 +34,7 @@ import { titleFromMessage } from '../hooks/chatSessions';
 
 import { useToast } from './Toast';
 
-import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconFile, IconBrain, IconCommand, IconLink } from './Icons';
+import { IconPlay, IconCopy, IconPlus, IconMic, IconArrowUp, IconBranch, IconCloud, IconChevron, IconStop, IconMore, IconExpand, IconFile, IconBrain, IconCommand, IconLink, IconSliders, IconPaperclip, IconHexagon, IconBook, IconHelp, IconWrench } from './Icons';
 import { ComposerCommandMenu, handleCommandMenuKey, pickComposerItem, useComposerCommands } from './ComposerCommands';
 import type { AgentMode, WorkspaceEnvironment } from '../models/agentModes';
 import { AgentErrorCard } from './AgentErrorCard';
@@ -823,23 +823,29 @@ export function ChatCenter({
 								disabled={running}
 								onClick={() => setPlusMenuOpen(v => !v)}
 							>
-								<IconPlus width={16} height={16} />
+								<IconPlus width={14} height={14} />
 							</button>
 							{plusMenuOpen && (
 								<div className="composer-plus-menu">
 									<div className="composer-plus-search">Add agents, context, tools...</div>
 									<div className="composer-plus-shortcuts">
 										<button type="button" className="composer-plus-shortcut" onClick={() => pickQuickMode('plan')}>
-											<IconCommand width={16} height={16} />
-											<span>Plan</span>
+											<span className="composer-plus-entry-left">
+												<IconSliders width={15} height={15} />
+												<span>Plan</span>
+											</span>
 										</button>
 										<button type="button" className="composer-plus-shortcut" onClick={() => pickQuickMode('debug')}>
-											<IconBrain width={16} height={16} />
-											<span>Debug</span>
+											<span className="composer-plus-entry-left">
+												<IconWrench width={15} height={15} />
+												<span>Debug</span>
+											</span>
 										</button>
 										<button type="button" className="composer-plus-shortcut" onClick={() => pickQuickMode('code')}>
-											<IconCopy width={16} height={16} />
-											<span>Ask</span>
+											<span className="composer-plus-entry-left">
+												<IconHelp width={15} height={15} />
+												<span>Ask</span>
+											</span>
 										</button>
 									</div>
 									<div className="composer-plus-divider" />
@@ -852,34 +858,42 @@ export function ChatCenter({
 										}}
 									>
 										<span className="composer-plus-entry-left">
-											<IconFile width={16} height={16} />
+											<IconPaperclip width={15} height={15} />
 											<span>Files</span>
 										</span>
 									</button>
 									<button type="button" className="composer-plus-entry">
 										<span className="composer-plus-entry-left">
-											<IconBrain width={16} height={16} />
+											<IconHexagon width={15} height={15} />
 											<span>Models</span>
 										</span>
-										<IconChevron width={14} height={14} />
+										<IconChevron width={12} height={12} />
 									</button>
 									<button type="button" className="composer-plus-entry">
 										<span className="composer-plus-entry-left">
-											<IconCommand width={16} height={16} />
+											<IconBook width={15} height={15} />
 											<span>Skills</span>
 										</span>
-										<IconChevron width={14} height={14} />
+										<IconChevron width={12} height={12} />
 									</button>
 									<button type="button" className="composer-plus-entry">
 										<span className="composer-plus-entry-left">
-											<IconLink width={16} height={16} />
+											<IconLink width={15} height={15} />
 											<span>MCP Servers</span>
 										</span>
-										<IconChevron width={14} height={14} />
+										<IconChevron width={12} height={12} />
 									</button>
 								</div>
 							)}
 						</div>
+						<button
+							type="button"
+							className="composer-auto"
+							title="Model selection (edit ~/Copix/settings.json)"
+						>
+							<span>Auto</span>
+							<IconChevron width={11} height={11} style={{ transform: 'rotate(90deg)' }} />
+						</button>
 						<textarea
 							ref={inputRef}
 							className="composer-input"
@@ -934,16 +948,8 @@ export function ChatCenter({
 								if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
 							}}
 						/>
-						<button
-							type="button"
-							className="composer-auto"
-							title="Model selection (edit ~/Copix/settings.json)"
-						>
-							<span>Auto</span>
-							<IconChevron width={11} height={11} style={{ transform: 'rotate(90deg)' }} />
-						</button>
 						<button type="button" className="composer-mic" title="Voice input (coming soon)" disabled>
-							<IconMic width={16} height={16} />
+							<IconMic width={14} height={14} />
 						</button>
 						{running ? (
 							<button
@@ -952,7 +958,7 @@ export function ChatCenter({
 								title="Stop"
 								onClick={stopRun}
 							>
-								<IconStop width={12} height={12} />
+								<IconStop width={11} height={11} />
 							</button>
 						) : (
 							<button
@@ -962,7 +968,7 @@ export function ChatCenter({
 								onClick={() => send(input)}
 								title="Send"
 							>
-								<IconArrowUp width={16} height={16} />
+								<IconArrowUp width={14} height={14} />
 							</button>
 						)}
 					</div>

@@ -12,8 +12,6 @@ import { MarkdownMessage } from './MarkdownMessage';
 
 import {
 
-	createDemoActivities,
-
 	createThinkingActivity,
 
 	createToolActivity,
@@ -45,13 +43,6 @@ import { FilesChangedCard, type FileChange } from './FilesChangedCard';
 import { collectFileChanges, collectSessionChanges, sumChanges } from '../utils/fileChanges';
 import { chatMessagesToAgentHistory } from '../utils/agentHistory';
 import { AgentWorkflowCard, liveStatusFromActivities } from './AgentWorkflowCard';
-import { ChatActivityList } from './ChatActivityList';
-
-/** Set true to preview activity rows on the empty chat screen. */
-
-const SHOW_ACTIVITY_DEMO = false;
-
-
 
 interface Props {
 
@@ -244,13 +235,6 @@ export function ChatCenter({
 	});
 
 	const modelReady = server.online;
-
-	const demoActivities = useMemo(
-		() => (SHOW_ACTIVITY_DEMO ? createDemoActivities() : []),
-		[],
-	);
-
-
 
 	const patchActivities = useCallback((fn: (prev: ChatActivity[]) => ChatActivity[]) => {
 
@@ -666,11 +650,9 @@ export function ChatCenter({
 		requestAnimationFrame(() => inputRef.current?.focus());
 	};
 
-	const isStartup = !messages.length && !streaming && !running;
-
 	return (
 
-		<div className={`chat-center${isStartup ? ' is-startup' : ''}`}>
+		<div className="chat-center">
 
 			{!modelReady && (
 				<div className="banner banner-warn">
@@ -732,106 +714,6 @@ export function ChatCenter({
 
 			}}>
 
-				{isStartup && (
-
-					<div className="chat-empty">
-						<div
-							className="startup-card"
-							onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-							onDrop={e => {
-								e.preventDefault();
-								e.stopPropagation();
-								if (e.dataTransfer.files?.length) addImageFiles(e.dataTransfer.files);
-							}}
-						>
-							<div className="startup-badges">
-								<span className="startup-badge">{branchLabel === 'main' ? 'copix' : branchLabel}</span>
-								<span className="startup-badge">{branchLabel}</span>
-								<span className="startup-badge">{locationLabel}</span>
-							</div>
-							<textarea
-								ref={inputRef}
-								className="startup-input"
-								placeholder={
-									!modelReady
-										? 'Set up your Copix model to start…'
-										: 'Plan, Build, / for skills, @ for context'
-								}
-								value={input}
-								disabled={running || !workspace || !modelReady}
-								rows={2}
-								onChange={e => {
-									setInput(e.target.value);
-									setCaret(e.target.selectionStart);
-									setCmdDismissed(false);
-									setCmdIndex(0);
-									e.target.style.height = 'auto';
-									e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-								}}
-								onClick={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
-								onKeyUp={e => setCaret((e.target as HTMLTextAreaElement).selectionStart)}
-								onPaste={handlePaste}
-								onKeyDown={e => {
-									if (e.key === 'Enter' && !e.shiftKey) {
-										e.preventDefault();
-										void send(input);
-									}
-								}}
-							/>
-							{attachments.length > 0 && (
-								<div className="composer-attachments">
-									{attachments.map((src, i) => (
-										<div key={i} className="composer-attachment">
-											<img src={src} alt="" />
-											<button type="button" aria-label="Remove image" onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}>×</button>
-										</div>
-									))}
-								</div>
-							)}
-							<div className="startup-actions">
-								<button type="button" className="startup-chip primary" onClick={() => { void window.copix?.openIdeWindow?.(); }}>
-									<IconExpand width={12} height={12} />
-									Open Editor
-								</button>
-								<button
-									type="button"
-									className="startup-chip"
-									onClick={() => {
-										setSessionMode('plan');
-										requestAnimationFrame(() => inputRef.current?.focus());
-									}}
-								>
-									Plan New Idea
-								</button>
-								<button
-									type="button"
-									className="startup-chip send"
-									disabled={(!input.trim() && !attachments.length) || !modelReady}
-									onClick={() => void send(input)}
-									title="Send"
-								>
-									<IconArrowUp width={12} height={12} />
-									Send
-								</button>
-							</div>
-						</div>
-
-						{demoActivities.length > 0 && (
-
-							<div className="activity-demo">
-
-								<span className="activity-demo-label">Activity preview</span>
-
-								<ChatActivityList activities={demoActivities} />
-
-							</div>
-
-						)}
-
-					</div>
-
-				)}
-
 				{messages.map(m => (
 					m.role === 'user' ? (
 						<UserPromptPill key={m.id} content={m.content} images={m.images} onReuse={reusePrompt} />
@@ -876,7 +758,7 @@ export function ChatCenter({
 
 
 
-			{!isStartup && <div className="composer">
+			<div className="composer">
 				<div
 					className={`composer-inner cursor-composer${running ? ' disabled' : ''}`}
 					onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
@@ -1085,7 +967,7 @@ export function ChatCenter({
 						)}
 					</div>
 				</div>
-			</div>}
+			</div>
 			</div>
 
 			<div className="chat-footer">

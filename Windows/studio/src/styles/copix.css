@@ -1009,99 +1009,6 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	min-height: 0;
 }
 .chat-stream > * { width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; }
-.chat-stream > .chat-empty { margin-top: auto; margin-bottom: auto; }
-
-.chat-empty {
-	margin: auto;
-	text-align: center;
-	max-width: 480px;
-	position: relative;
-	padding: 12px 12px 8px;
-}
-.empty-glow { display: none; }
-.startup-badges {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	flex-wrap: wrap;
-	margin-bottom: 10px;
-}
-.startup-badge {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	color: #a1a1aa;
-	font-size: 11.5px;
-}
-.startup-card {
-	max-width: 480px;
-	margin: 0 auto;
-	padding: 12px 14px 12px;
-	border: 1px solid rgba(255,255,255,0.08);
-	border-radius: 14px;
-	background: #222225;
-	text-align: left;
-}
-.startup-placeholder {
-	margin: 0;
-	color: #6b6b73;
-	font-size: 13px;
-	line-height: 1.45;
-}
-.startup-input {
-	display: block;
-	width: 100%;
-	min-height: 44px;
-	max-height: 120px;
-	margin: 0;
-	padding: 0;
-	border: none;
-	background: transparent;
-	color: #ececf1;
-	font: inherit;
-	font-size: 13px;
-	line-height: 1.45;
-	resize: none;
-	outline: none;
-}
-.startup-input::placeholder { color: #6b6b73; }
-.startup-input:disabled { opacity: 0.55; }
-.startup-actions {
-	display: flex;
-	gap: 8px;
-	flex-wrap: wrap;
-	margin-top: 12px;
-}
-.startup-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	padding: 5px 10px;
-	border-radius: 999px;
-	border: 1px solid rgba(255,255,255,0.08);
-	background: transparent;
-	color: #c8c8d0;
-	font: inherit;
-	font-size: 12px;
-	cursor: pointer;
-}
-.startup-chip.primary {
-	background: rgba(74, 222, 128, 0.12);
-	color: #86efac;
-	border-color: rgba(74, 222, 128, 0.18);
-}
-.startup-chip.send {
-	margin-left: auto;
-	background: #ececf1;
-	color: #111113;
-	border-color: transparent;
-}
-.startup-chip.send:disabled {
-	opacity: 0.35;
-	cursor: default;
-}
-.chat-empty h2,
-.chat-empty > p { display: none; }
 
 .suggestion-grid { display: none; }
 .suggestion-card {
@@ -2907,8 +2814,8 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	background: transparent;
 	color: #c8c8d0;
 	text-align: left;
-	padding: 7px 8px;
-	border-radius: 8px;
+	padding: 5px 8px;
+	border-radius: 6px;
 	cursor: pointer;
 	font: inherit;
 }
@@ -2958,7 +2865,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	padding: 6px 4px;
+	padding: 4px 4px;
 	border: none;
 	background: transparent;
 	color: #c8c8d0;
@@ -2966,7 +2873,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	cursor: pointer;
 	text-align: left;
 	font: inherit;
-	font-size: 12.5px;
+	font-size: 12px;
 }
 .agent-row.nested .chat-item.active,
 .agent-row.nested.active .chat-item { color: #ececf1; }

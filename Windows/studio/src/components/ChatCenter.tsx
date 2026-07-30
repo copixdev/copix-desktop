@@ -28,7 +28,7 @@ import {
 
 } from '../chatActivity';
 
-import { ChatMessage, AppSettings, type AgentAction } from '../types';
+import { ChatMessage, AppSettings, type AgentAction, type ModelSettings } from '../types';
 
 import { titleFromMessage } from '../hooks/chatSessions';
 
@@ -42,8 +42,8 @@ import { UserPromptPill } from './UserPromptPill';
 import { FilesChangedCard, type FileChange } from './FilesChangedCard';
 import { collectFileChanges, collectSessionChanges, sumChanges } from '../utils/fileChanges';
 import { chatMessagesToAgentHistory } from '../utils/agentHistory';
+import { AgentWorkflowCard, liveStatusFromActivities } from './AgentWorkflowCard';
 import { ModelPickerMenu } from './ModelPickerMenu';
-import type { ModelSettings } from '../types';
 
 interface Props {
 

@@ -42,6 +42,7 @@ import { UserPromptPill } from './UserPromptPill';
 import { FilesChangedCard, type FileChange } from './FilesChangedCard';
 import { collectFileChanges, collectSessionChanges, sumChanges } from '../utils/fileChanges';
 import { chatMessagesToAgentHistory } from '../utils/agentHistory';
+import { AgentWorkflowCard, liveStatusFromActivities } from './AgentWorkflowCard';
 import { ModelPickerMenu } from './ModelPickerMenu';
 
 interface Props {

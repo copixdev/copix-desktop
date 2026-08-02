@@ -286,6 +286,7 @@ function sessionWorkspaceRoot(sessionId: string): string {
 	return preferred;
 }
 
+/** Nice project folder names: ollama-dev-agent, marketing-site, etc. */
 function slugify(name: string): string {
 	return name
 		.trim()
@@ -293,7 +294,42 @@ function slugify(name: string): string {
 		.replace(/['"]/g, '')
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-+|-+$/g, '')
-		.slice(0, 42) || 'project';
+		.slice(0, 64) || 'project';
+}
+
+/** Normalize Finder-style / user-typed paths into absolute OS paths. */
+function normalizeUserPath(raw: string, workspaceRoot?: string): string {
+	let p = raw.trim().replace(/\\/g, '/');
+	if (!p) throw new Error('Empty path');
+
+	const home = app.getPath('home');
+	const username = path.basename(home);
+	const isWin = process.platform === 'win32';
+
+	// "Macintosh HD/Users/name/..." or "Macintosh HD:Users:..."
+	p = p.replace(/^macintosh hd[/:]?/i, '/');
+
+	if (p.startsWith('~/') || p === '~') {
+		return path.normalize(path.join(home, p.slice(1).replace(/^\/+/, '')));
+	}
+
+	// users/{name}/... → OS user profile
+	if (/^\/?users\//i.test(p)) {
+		const rest = p.replace(/^\/?users\/[^/]+\/?/i, '');
+		const named = p.match(/^\/?users\/([^/]+)/i)?.[1];
+		const base = named && named.toLowerCase() !== 'current' && named !== '{username}'
+			? (isWin ? `C:/Users/${named}` : `/Users/${named}`)
+			: home;
+		p = rest ? `${base.replace(/\\/g, '/')}/${rest}` : base.replace(/\\/g, '/');
+	}
+
+	p = p.replace(/\{username\}/gi, username);
+	p = p.replace(/^\/Users\/current\/?/i, `${home.replace(/\\/g, '/')}/`);
+
+	if (path.isAbsolute(p) || /^[A-Za-z]:\//.test(p)) {
+		return path.normalize(p);
+	}
+	return resolvePath(p, workspaceRoot ?? projectsRoot());
 }
 
 function agentsDir(): string {
@@ -393,37 +429,59 @@ async function getGitRemote(workspaceRoot: string): Promise<string | undefined> 
 	});
 }
 
-async function ensureSessionWorkspace(sessionId: string): Promise<{ root: string; tree: string[] }> {
-	const root = sessionWorkspaceRoot(sessionId);
+/**
+ * New agents start in the user's home directory (/Users/{user} or C:\\Users\\{user}),
+ * so they can see and edit the whole machine (absolute paths + home tree).
+ * Do NOT sandbox into .copix/sessions/agent-* or git-init the home folder.
+ */
+async function ensureSessionWorkspace(_sessionId: string): Promise<{ root: string; tree: string[] }> {
+	const root = projectsRoot();
 	await fs.mkdir(root, { recursive: true });
-	await gitInit(root);
-	return { root, tree: await listTree(root) };
+	return { root, tree: await listTree(root, 400) };
 }
 
 async function createNamedProject(
-	sessionId: string,
+	_sessionId: string,
 	name: string,
 	description?: string,
 	outputPath?: string,
 ): Promise<{ root: string; tree: string[] }> {
+	const slug = slugify(name);
 	const requestedBase = outputPath?.trim();
 	let dest: string;
 	if (requestedBase) {
-		dest = path.isAbsolute(requestedBase)
-			? path.normalize(requestedBase)
-			: path.join(sessionWorkspaceRoot(sessionId), requestedBase);
-	} else {
-		const slug = slugify(name);
-		dest = path.join(projectsRoot(), slug);
-		let n = 1;
-		while (fsSync.existsSync(dest)) {
-			dest = path.join(projectsRoot(), `${slug}-${n++}`);
+		const normalized = normalizeUserPath(requestedBase, projectsRoot());
+		const baseSlug = slugify(path.basename(normalized));
+		const exists = fsSync.existsSync(normalized);
+		const isDir = exists && fsSync.statSync(normalized).isDirectory();
+		const emptyDir = isDir
+			&& fsSync.readdirSync(normalized).filter(e => e !== '.DS_Store' && e !== '.git').length === 0;
+		// Full project path (ends with the project name) vs parent folder (e.g. ~/sites).
+		const isExplicitProjectPath = baseSlug === slug || baseSlug.startsWith(`${slug}-`);
+		if (isExplicitProjectPath && (!exists || emptyDir)) {
+			dest = normalized;
+		} else if (isDir || /[/\\]$/.test(requestedBase) || !isExplicitProjectPath) {
+			dest = path.join(normalized, slug);
+		} else {
+			dest = normalized;
 		}
+	} else {
+		dest = path.join(projectsRoot(), slug);
+	}
+	let n = 1;
+	const baseDest = dest;
+	while (fsSync.existsSync(dest)) {
+		const populated = fsSync.readdirSync(dest).filter(e => e !== '.DS_Store').length > 0;
+		if (!populated) break;
+		dest = `${baseDest}-${n++}`;
 	}
 	await fs.mkdir(dest, { recursive: true });
-	const title = name.trim() || path.basename(dest);
-	const readme = `# ${title}\n\n${description?.trim() || 'Created by Copix agent.'}\n`;
-	await fs.writeFile(path.join(dest, 'README.md'), readme, 'utf8');
+	const title = name.trim().replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || path.basename(dest);
+	const readmePath = path.join(dest, 'README.md');
+	if (!fsSync.existsSync(readmePath)) {
+		const readme = `# ${title}\n\n${description?.trim() || 'Created by Copix agent.'}\n`;
+		await fs.writeFile(readmePath, readme, 'utf8');
+	}
 	await gitInit(dest);
 	return { root: dest, tree: await listTree(dest) };
 }
@@ -757,9 +815,9 @@ app.whenReady().then(() => {
 		return { root, tree: await listTree(root), sessionId };
 	});
 
-	ipcMain.handle('copix:cloneRepo', async (_e, url: string, sessionId?: string) => {
-		const parent = sessionId ? sessionWorkspaceRoot(sessionId) : projectsRoot();
-		const name = url.split('/').pop()?.replace(/\.git$/, '') ?? 'repo';
+	ipcMain.handle('copix:cloneRepo', async (_e, url: string, _sessionId?: string) => {
+		const parent = projectsRoot();
+		const name = slugify(url.split('/').pop()?.replace(/\.git$/, '') ?? 'repo');
 		const dest = path.join(parent, name);
 		await fs.mkdir(parent, { recursive: true });
 		if (!fsSync.existsSync(dest)) {

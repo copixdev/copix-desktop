@@ -20,7 +20,13 @@ import { subscribeAgentTerminal } from './utils/terminalBridge';
 import { isMac } from './utils/platform';
 
 async function ensureWorkspace(session: ChatSession): Promise<ChatSession> {
-	if (session.workspaceRoot) return session;
+	const normalized = session.workspaceRoot?.replace(/\\/g, '/') ?? '';
+	const leaf = normalized.split('/').filter(Boolean).pop() ?? '';
+	const isLegacySandbox = /\/\.copix\/sessions\//i.test(normalized)
+		|| /\/agent-workspaces\//i.test(normalized)
+		|| /^agent-\d+$/i.test(leaf);
+	if (session.workspaceRoot && !isLegacySandbox) return session;
+	// New agents (and old session sandboxes) use the user home so the whole machine is reachable.
 	const ws = await copix.createSessionWorkspace(session.id);
 	return { ...session, workspaceRoot: ws.root };
 }

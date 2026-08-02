@@ -1,6 +1,6 @@
 import type { AgentMode } from './agentModes.js';
 import { getAgentMode } from './agentModes.js';
-import { isMac, isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
+import { homePathExample, isMac, isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
 import type { TaskKind } from './modelCatalog.js';
 import { isReadOnlyTask } from './modelSelector.js';
 
@@ -11,7 +11,8 @@ export const DEFAULT_RULES = [
 	'If the user asks for a **new** script/app/file, **write that new file** with `write_file`. Do not run, edit, or re-test unrelated existing scripts.',
 	'If the user asks to inspect, explain, review, or understand — read the workspace and answer in chat. Do NOT create or modify files.',
 	'Never call `create_project` unless the user explicitly asks for a brand-new project from scratch.',
-	'Never call `create_project` when the workspace already has files — use `list_dir` and `read_file` instead.',
+	'When creating a project, invent a nice kebab-case folder name (e.g. `ollama-dev-agent`, `marketing-site`) under the user home, or inside a parent path the user named.',
+	'The default workspace is the user home — it normally already has files. That does NOT block `create_project` for a new app.',
 	'Use the **minimum** tools needed, but use as many rounds as needed to **complete** the task.',
 	'Read files before editing. Prefer `edit_file` over `write_file` for small changes.',
 	'Never invent file paths — verify with `list_dir` or `grep` first.',
@@ -112,7 +113,7 @@ Do **not** use write, delete, terminal, or create_project tools for this task.`;
 
 | Tool | When to use |
 |------|-------------|
-| \`create_project\` | **Only** when user explicitly wants a new repo and workspace is empty |
+| \`create_project\` | New app/site/repo — invent a kebab name like \`ollama-dev-agent\` under the user home (or \`outputPath\` parent) |
 | \`read_file\` | Inspect source before editing |
 | \`edit_file\` | Surgical search-and-replace in existing files |
 | \`write_file\` | New files or full rewrites (complete content) |
@@ -126,9 +127,10 @@ Do **not** use write, delete, terminal, or create_project tools for this task.`;
 
 ### File paths
 
+- Default workspace is the user home (\`${homePathExample()}\`).
 - Relative paths resolve from the workspace root.
-- Absolute paths are allowed.
-- Never use \`copix-output\` as a folder name.`;
+- Absolute paths work anywhere on the machine.
+- New projects: nice kebab-case folders (e.g. \`ollama-dev-agent\`), never \`agent-<timestamp>\` or \`copix-output\`.`;
 }
 
 export interface SystemPromptOptions {
@@ -171,8 +173,9 @@ ${rules.map(r => `- ${r}`).join('\n')}
 ## Workspace
 
 - **Root:** \`${opts.workspaceRoot}\`
-- The user is working in this folder. Inspect **this** workspace — do not create duplicate projects elsewhere unless explicitly asked.
-- Relative paths are relative to this root.
+- Agents start in the user home so the whole machine is reachable (absolute paths OK).
+- For a **new** app, call \`create_project\` with a kebab name — it creates \`${projectPathExample('<name>')}\` (or under a parent the user specified), then work inside that folder.
+- Relative paths are relative to the current workspace root (switches to the new project after \`create_project\`).
 
 ${toolGuidance(readOnly)}
 

@@ -26,6 +26,23 @@ const HIDDEN_DIRS = new Set([
 	'tools',
 	'output',
 	'.husky',
+	// Home-directory noise (workspace can be /Users/{user})
+	'Library',
+	'Applications',
+	'Movies',
+	'Music',
+	'Pictures',
+	'Public',
+	'Parallels',
+	'VirtualBox VMs',
+	'AppData',
+	'Application Data',
+	'Local Settings',
+	'Cookies',
+	'Recent',
+	'SendTo',
+	'Start Menu',
+	'Templates',
 ]);
 
 const HIDDEN_FILE_NAMES = new Set([

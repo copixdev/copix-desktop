@@ -57,27 +57,27 @@ const TOOLS = [
 		function: {
 			name: 'create_project',
 			description: `## create_project
-Scaffold a new git-initialized project folder.
+Create a new git-initialized project folder with a **nice kebab-case name**.
 
-**When to use:** ONLY when the user explicitly asks for a brand-new app/site/repo AND the workspace is empty.
+**When to use:** User asks for a brand-new app/site/repo/template.
 
-**Do NOT use when:**
-- The user asks to inspect, explain, or review existing code
-- The workspace already has files
-- The user referenced an existing folder or project
+**Naming:** Generate a short descriptive slug — e.g. \`ollama-dev-agent\`, \`marketing-site\`, \`invoice-dashboard\`. Never use \`agent-123…\` or \`project\`.
 
-**Output location:** \`${projectPathExample('<kebab-name>')}\` unless \`outputPath\` is set.
+**Default location:** \`${projectPathExample('<kebab-name>')}\` (user home).
+If the user names a folder (e.g. ~/sites or /Users/…/sites), pass it as \`outputPath\` and the project is created inside it.
+
+**Do NOT use when:** Inspecting/editing an existing project — use read/edit/write instead.
 
 **Parameters:**
-- \`name\` (required) — kebab-case project name you generate
+- \`name\` (required) — kebab-case project name you invent from the request
 - \`description\` — one-line summary written to README
-- \`outputPath\` — optional absolute or workspace-relative directory`,
+- \`outputPath\` — optional parent directory or full project path`,
 			parameters: {
 				type: 'object',
 				properties: {
-					name: { type: 'string', description: 'Short project name you generate from requirements' },
+					name: { type: 'string', description: 'Kebab-case name, e.g. ollama-dev-agent' },
 					description: { type: 'string', description: 'One-line summary of the project' },
-					outputPath: { type: 'string', description: 'Optional absolute or relative output directory when user requests a specific route' },
+					outputPath: { type: 'string', description: 'Optional parent folder or full path (e.g. /Users/you/sites)' },
 				},
 				required: ['name'],
 			},
@@ -505,26 +505,16 @@ async function executeTool(
 
 	switch (tool) {
 		case 'create_project': {
-			const entries = await copix.listDir(undefined, ws);
-			const existing = entries.filter(e => {
-				const name = e.replace(/\/$/, '');
-				return name && name !== 'README.md';
-			});
-			if (existing.length > 0) {
-				return {
-					result: `Refused create_project: workspace already has files (${existing.slice(0, 10).join(', ')}). `
-						+ 'Use list_dir and read_file to inspect, or edit_file/write_file to modify.',
-				};
-			}
-			const projectName = String(args.name ?? 'project');
+			const projectName = String(args.name ?? 'project').trim() || 'project';
 			assertSafeFilePath(projectName);
 			const desc = args.description ? String(args.description) : undefined;
 			const outputPath = args.outputPath ? String(args.outputPath) : undefined;
 			if (outputPath) assertSafeFilePath(outputPath);
 			const result = await copix.createProject(ctx.sessionId, projectName, desc, outputPath);
 			ctx.onWorkspaceChange?.(result.root);
+			const folder = result.root.replace(/\\/g, '/').split('/').filter(Boolean).pop() || projectName;
 			return {
-				result: `Created project "${projectName}" at ${result.root}\nFiles: ${result.tree.slice(0, 20).join(', ')}`,
+				result: `Created project "${folder}" at ${result.root}\nFiles: ${result.tree.slice(0, 20).join(', ')}`,
 			};
 		}
 		case 'multitask': {

@@ -79,10 +79,10 @@ export const DEFAULT_WORKSPACE: WorkspaceSettings = {
 };
 
 export const DEFAULT_MODEL: ModelSettings = {
-	provider: 'groq',
+	provider: 'ollama',
 	apiKey: '',
 	selection: 'auto',
-	modelId: 'llama-3.3-70b-versatile',
+	modelId: 'qwen2.5:3b',
 	lowVram: false,
 };
 

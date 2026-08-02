@@ -12,7 +12,7 @@ import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData
 import { DEFAULT_SETTINGS, AppSettings } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
-import { normalizeProvider, sanitizeGroqModelId } from './models/modelCatalog';
+import { normalizeProvider } from './models/modelCatalog';
 import { formatModelChipLabel, preferredModelForTask } from './models/modelSelector';
 import { TitleBarMenu } from './components/TitleBarMenu';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
@@ -115,17 +115,19 @@ function AppInner() {
 				return;
 			}
 			const raw = s as AppSettings & { model?: Partial<AppSettings['model']> };
-			const provider = normalizeProvider(raw.model?.provider ?? DEFAULT_SETTINGS.model.provider);
+			// Copix uses local Ollama by default — ignore cloud providers in settings.
+			const provider = 'ollama' as const;
 			const rawModelId = raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId;
+			const looksCloudModel = /^(~?anthropic\/|openai\/|google\/|meta-llama\/|llama-3\.|gpt-|o3)/i.test(rawModelId);
+			const modelId = looksCloudModel ? DEFAULT_SETTINGS.model.modelId : rawModelId;
 			setSettings({
 				...DEFAULT_SETTINGS, ...raw,
 				model: {
 					...DEFAULT_SETTINGS.model,
 					...raw.model,
 					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
-					modelId: provider === 'groq' ? sanitizeGroqModelId(rawModelId) : rawModelId,
+					modelId,
 					provider,
-					// Keep disk key as-is — never fall back to a placeholder that overwrites the file.
 					apiKey: typeof raw.model?.apiKey === 'string' ? raw.model.apiKey : '',
 				},
 				layout: { ...DEFAULT_SETTINGS.layout, ...raw.layout },

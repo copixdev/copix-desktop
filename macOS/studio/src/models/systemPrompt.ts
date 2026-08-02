@@ -22,6 +22,8 @@ export const DEFAULT_RULES = [
 	'**Do NOT use `spawn_subagent` for simple work** — greetings, questions, single-file edits, inspect/explain, or anything you can finish in a few tool calls yourself.',
 	'Use `spawn_subagent` **only** for hard multi-part jobs (large refactors, many independent files/features in parallel) when splitting clearly helps.',
 	`Use the \`terminal\` tool only when shell commands are required for the **current** user request (build/test/install the thing they asked for — not unrelated scripts).`,
+	'**Never use `terminal` to talk to the user.** Do not `echo` / `printf` greetings or answers — reply in chat markdown instead.',
+	'For greetings and simple questions ("hello", "hi", "thanks"), reply in chat with **no tools**.',
 ];
 
 function hostOsRules(): string[] {
@@ -76,6 +78,12 @@ const READ_ONLY_RULES = [
 	'After reading, reply in clear markdown: structure, key files, how things connect, and how to run the project.',
 ];
 
+const CHAT_ONLY_RULES = [
+	'**CHAT TASK** — greetings or simple conversation.',
+	'Reply in markdown with **no tool calls**.',
+	'Do NOT use `terminal`, `echo`, `printf`, or any file tools.',
+];
+
 const RESPONSE_GUIDANCE = `## Response workflow
 
 1. **Understand the request** — re-read the **latest** user message. Match their intent (explain vs build vs fix vs continue). Ignore unrelated files unless they asked about them.
@@ -121,7 +129,7 @@ Do **not** use write, delete, terminal, or create_project tools for this task.`;
 | \`delete_file\` | Remove a file |
 | \`grep\` | Search codebase (ripgrep) |
 | \`list_dir\` | Explore folder structure |
-| \`terminal\` | Local shell — build, test, install (\`elevate=true\` for admin/sudo) |
+| \`terminal\` | Local shell — build, test, install only (\`elevate=true\` for admin/sudo). Never \`echo\` to chat. |
 | \`multitask\` | Parallel independent reads/searches |
 | \`spawn_subagent\` | **Rare** — only hard multi-part parallel work; never for chat, inspect, or small edits |
 
@@ -143,15 +151,17 @@ export interface SystemPromptOptions {
 export function buildSystemPrompt(opts: SystemPromptOptions): string {
 	const modeDef = getAgentMode(opts.mode);
 	const readOnly = opts.taskKind ? isReadOnlyTask(opts.taskKind) : false;
+	const chatOnly = opts.taskKind === 'general';
 	const rules = [
 		...DEFAULT_RULES,
 		...hostOsRules(),
 		...(readOnly ? READ_ONLY_RULES : []),
+		...(chatOnly ? CHAT_ONLY_RULES : []),
 		...MODE_RULES[opts.mode],
 	];
 
 	const taskLine = opts.taskKind
-		? `\n**Detected task:** ${opts.taskKind}${readOnly ? ' (read-only — no file changes)' : ''}\n`
+		? `\n**Detected task:** ${opts.taskKind}${readOnly ? ' (read-only — no file changes)' : chatOnly ? ' (chat only — no tools)' : ''}\n`
 		: '';
 	const requestLine = opts.userMessage?.trim()
 		? `\n**User request (do this — nothing else):** ${opts.userMessage.trim().slice(0, 500)}\n`

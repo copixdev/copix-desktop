@@ -9,7 +9,7 @@ import {
 	GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS, GROQ_VISION_MODEL,
 	OPENROUTER_MAX_TOKENS, OPENROUTER_MAX_TOKENS_FLOOR, parseOpenRouterAffordableTokens, sanitizeGroqModelId,
 } from './modelCatalog.js';
-import { inferTaskKind, isContinuationMessage, isReadOnlyTask } from './modelSelector.js';
+import { inferTaskKind, isContinuationMessage, isReadOnlyTask, isSimpleChatMessage } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
 import { assertSafeFilePath } from '../utils/secrets.js';
@@ -264,6 +264,8 @@ Run a **local shell command** on the user's machine (${shellLabel()}). Output st
 
 **When to use:** Install packages, run builds/tests, git, npm, pip, scaffolding CLIs, inspect environment. Do NOT use for directory creation — use write_file instead (dirs are auto-created).
 
+**Never use terminal to speak to the user.** Do not run \`echo\` / \`printf\` for greetings or chat replies — answer in markdown instead.
+
 **Local access:** Commands run in the workspace directory by default. You have full local shell access unless the user declines elevation.
 
 **Parameters:**
@@ -331,7 +333,7 @@ const GROQ_TOOL_BLURBS: Record<string, string> = {
 	delete_file: 'Delete a file.',
 	grep: 'Search file contents with ripgrep.',
 	list_dir: 'List files in a directory.',
-	terminal: 'Run a shell command for the CURRENT user request only — never re-run unrelated scripts in a loop.',
+	terminal: 'Run a shell command for the CURRENT user request only — never echo/printf to chat, never re-run unrelated scripts.',
 	spawn_subagent: 'RARE: spawn child agent only for hard multi-part parallel work — never for greetings or simple tasks.',
 };
 
@@ -346,13 +348,12 @@ function compactTools(tools: typeof TOOLS): typeof TOOLS {
 	}));
 }
 
-const SIMPLE_CHAT_RE = /^(hi|hello|hey|thanks|thank you|ok|okay|yo|sup|good morning|good evening|how are you|what can you do)\b[\s!.?]*$/i;
 const HARD_TASK_RE = /\b(refactor|migrate|multi[- ]?file|entire (app|project|codebase)|across (the )?(app|project|repo)|parallel|many files|full stack|end[- ]to[- ]end|large (feature|change)|architecture)\b/i;
 
 /** Subagents only for clearly hard multi-part implement work — not chat/inspect/simple edits. */
 export function shouldOfferSubagent(userMessage: string, taskKind: TaskKind): boolean {
 	const msg = userMessage.trim();
-	if (!msg || SIMPLE_CHAT_RE.test(msg) || msg.length < 24) return false;
+	if (!msg || isSimpleChatMessage(msg) || msg.length < 24) return false;
 	if (isReadOnlyTask(taskKind) || taskKind === 'terminal' || taskKind === 'general') return false;
 	if (taskKind === 'implement' || taskKind === 'debug') {
 		return HARD_TASK_RE.test(msg) || msg.length >= 160;
@@ -360,7 +361,14 @@ export function shouldOfferSubagent(userMessage: string, taskKind: TaskKind): bo
 	return false;
 }
 
+/** Pure chat — no tools (stops small models from `terminal echo` greetings). */
+function isChatOnlyTask(taskKind: TaskKind, userMessage?: string): boolean {
+	if (taskKind === 'general') return true;
+	return Boolean(userMessage && isSimpleChatMessage(userMessage));
+}
+
 function toolsForTask(taskKind: TaskKind, provider?: string, userMessage?: string): typeof TOOLS {
+	if (isChatOnlyTask(taskKind, userMessage)) return [];
 	let base = isReadOnlyTask(taskKind)
 		? TOOLS.filter(t => READ_ONLY_TOOL_NAMES.has(t.function.name))
 		: TOOLS;
@@ -368,6 +376,15 @@ function toolsForTask(taskKind: TaskKind, provider?: string, userMessage?: strin
 		base = base.filter(t => t.function.name !== 'spawn_subagent');
 	}
 	return provider === 'groq' ? compactTools(base) : base;
+}
+
+/** Detect using the shell as a chat channel (`echo Hello`). */
+function isTerminalEchoCommand(command: string): boolean {
+	const c = command.trim();
+	if (!c) return false;
+	if (/^(echo|printf)\b/i.test(c)) return true;
+	if (/^(python3?|node|ruby|perl)\s+-c\s+['"]?(print|console\.log)/i.test(c)) return true;
+	return false;
 }
 
 type ContentPart =
@@ -469,6 +486,13 @@ async function runTerminalCommand(
 ): Promise<ToolResultMeta> {
 	const command = String(args.command ?? args.cmd ?? '').trim();
 	if (!command) return { result: 'terminal requires a command' };
+	if (isTerminalEchoCommand(command)) {
+		return {
+			result:
+				'Refused: do not use `terminal` with echo/printf to talk to the user. '
+				+ 'Reply in chat markdown instead (no tool call).',
+		};
+	}
 	const elevate = Boolean(args.elevate) || needsElevateHint(command);
 	const cwd = args.cwd ? String(args.cwd) : ws;
 	const streamId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -741,13 +765,14 @@ async function streamCompletion(
 	for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
 		const modelId = modelCandidates[attempt]!;
 		const normalizedMessages = normalizeMessagesForModel(messages, modelId);
+		const tools = opts.tools?.length ? opts.tools : undefined;
 		const requestBody = isCloud
 			? {
 				model: modelId,
 				messages: normalizedMessages,
-				...(opts.tools
+				...(tools
 					? {
-						tools: opts.tools,
+						tools,
 						tool_choice: 'auto',
 						...(config.provider === 'groq' ? { parallel_tool_calls: false } : {}),
 					}
@@ -759,7 +784,7 @@ async function streamCompletion(
 			: {
 				model: modelId,
 				messages: normalizedMessages,
-				...(opts.tools ? { tools: opts.tools } : {}),
+				...(tools ? { tools } : {}),
 				stream: true,
 				temperature: 0.05,
 				options: {
@@ -992,12 +1017,14 @@ export async function runAgent(
 				const parsed = parseStructuredResponse(assistantText);
 				if (parsed) {
 					const displayMessage = parsed.message || '(executed actions)';
-					const actions = isReadOnlyTask(taskKind)
-						? parsed.actions.filter(a => {
-							const mapped = actionToTool(a);
-							return mapped && !WRITE_TOOL_NAMES.has(normalizeToolName(mapped.tool));
-						})
-						: parsed.actions;
+					const actions = isChatOnlyTask(taskKind, effectiveUserMessage)
+						? []
+						: isReadOnlyTask(taskKind)
+							? parsed.actions.filter(a => {
+								const mapped = actionToTool(a);
+								return mapped && !WRITE_TOOL_NAMES.has(normalizeToolName(mapped.tool));
+							})
+							: parsed.actions;
 					if (actions.length) {
 						hadToolUse = true;
 						await executeStructuredActions({ ...parsed, actions }, runCtx, callbacks);
@@ -1086,6 +1113,24 @@ export async function runAgent(
 					messages.push({
 						role: 'tool',
 						content: `Refused ${toolName}: read-only task — use list_dir/read_file/grep and explain in chat.`,
+						tool_call_id: call.id,
+						name: call.name,
+					});
+					continue;
+				}
+				if (isChatOnlyTask(taskKind, effectiveUserMessage) && toolName !== 'list_dir' && toolName !== 'read_file') {
+					messages.push({
+						role: 'tool',
+						content: `Refused ${toolName}: this is a chat reply — answer the user in markdown with no tools.`,
+						tool_call_id: call.id,
+						name: call.name,
+					});
+					continue;
+				}
+				if (toolName === 'terminal' && isTerminalEchoCommand(String(args.command ?? args.cmd ?? ''))) {
+					messages.push({
+						role: 'tool',
+						content: 'Refused: do not use terminal echo/printf to talk to the user. Reply in chat markdown.',
 						tool_call_id: call.id,
 						name: call.name,
 					});

@@ -25,9 +25,17 @@ const TERMINAL_RE = /\b(run|install|npm|pnpm|yarn|brew|git|terminal|command|exec
 const IMPLEMENT_RE = /\b(create|implement|add feature|scaffold|new app|new project|new (python |js |ts )?script|write (a |me )?(new )?|build me|make (me |a |an )?|generate|enhance|improve|extend|update|modify|refactor|simulation|pygame)\b/i;
 const CONTINUATION_RE = /^(yes|yeah|yep|yup|ok|okay|sure|go ahead|continue|proceed|do it|create|yes create|enhance|keep going|finish( it)?|complete( it)?|do that|make it|add that|go on|carry on|please do|do so)\.?!?\s*$/i;
 const GREETING_RE = /^(hi|hello|hey|yo|sup|howdy|good (morning|afternoon|evening)|thanks|thank you|thx|hola|你好)\.?!?\s*$/i;
+/** Short chat / small-talk — answer in text, never tools (especially not `terminal echo`). */
+const SIMPLE_CHAT_RE = /^(hi|hello|hey|thanks|thank you|thx|ok|okay|yo|sup|howdy|hola|你好|good (morning|afternoon|evening)|how are you|what can you do|who are you|help)\b[\s!.?]*$/i;
 
 export function isContinuationMessage(userMessage: string): boolean {
 	return CONTINUATION_RE.test(userMessage.trim());
+}
+
+/** True for greetings / small talk that must stay tool-free. */
+export function isSimpleChatMessage(userMessage: string): boolean {
+	const msg = userMessage.trim();
+	return !msg || GREETING_RE.test(msg) || SIMPLE_CHAT_RE.test(msg);
 }
 
 export function inferTaskKind(userMessage: string, agentMode: AgentMode): TaskKind {

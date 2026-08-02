@@ -92,12 +92,19 @@ export const GROQ_MAX_TOKENS_RETRY = 768;
 /** OpenRouter — one paid key for frontier models (Claude Opus, GPT, Gemini). */
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
+/**
+ * OpenRouter reserves credits for the full max_tokens budget up-front.
+ * Keep this modest so frontier models work on small balances; router retries lower on 402.
+ */
+export const OPENROUTER_MAX_TOKENS = 2048;
+export const OPENROUTER_MAX_TOKENS_FLOOR = 512;
+
 /** `~family-latest` aliases always resolve to the newest version on OpenRouter. */
-export const OPENROUTER_DEFAULT_MODEL = '~anthropic/claude-opus-latest';
+export const OPENROUTER_DEFAULT_MODEL = '~anthropic/claude-sonnet-latest';
 
 export const OPENROUTER_FEATURED_MODELS = [
+	{ id: '~anthropic/claude-sonnet-latest', label: 'Claude Sonnet', detail: 'Latest · Balanced' },
 	{ id: '~anthropic/claude-opus-latest', label: 'Claude Opus', detail: 'Latest · Best' },
-	{ id: '~anthropic/claude-sonnet-latest', label: 'Claude Sonnet', detail: 'Latest · Fast' },
 	{ id: 'anthropic/claude-opus-5', label: 'Claude Opus 5', detail: 'Pinned' },
 	{ id: 'openai/gpt-4o', label: 'GPT-4o', detail: 'OpenAI' },
 	{ id: 'openai/gpt-4.1', label: 'GPT-4.1', detail: 'OpenAI' },
@@ -105,6 +112,14 @@ export const OPENROUTER_FEATURED_MODELS = [
 	{ id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', detail: 'Google' },
 	{ id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', detail: 'Cheap' },
 ] as const;
+
+/** Parse OpenRouter "can only afford N" from a 402 body. */
+export function parseOpenRouterAffordableTokens(message: string): number | undefined {
+	const match = message.match(/can only afford\s+(\d+)/i);
+	if (!match) return undefined;
+	const n = Number(match[1]);
+	return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+}
 
 /** Direct OpenAI API. */
 export const OPENAI_BASE_URL = 'https://api.openai.com/v1';

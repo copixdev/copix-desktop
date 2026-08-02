@@ -93,6 +93,22 @@ export function formatAgentError(raw: string): FormattedAgentError {
 		};
 	}
 
+	if (
+		low.includes('openrouter')
+		&& (low.includes('402') || low.includes('more credits') || low.includes('can only afford') || low.includes('max_tokens'))
+	) {
+		return {
+			title: 'OpenRouter credits',
+			summary: 'OpenRouter rejected the request because your credit balance cannot reserve the token budget (or the model is too expensive for the remaining balance).',
+			detail: ollamaMsg,
+			hints: [
+				'Add credits at https://openrouter.ai/settings/credits',
+				'Or pick a cheaper model (Claude Sonnet / Llama) in the model picker.',
+				'Copix retries automatically with a smaller max_tokens — restart Copix if you still see 8192 in the error.',
+			],
+		};
+	}
+
 	return {
 		title: 'Agent error',
 		summary: ollamaMsg.length > 280 ? ollamaMsg.slice(0, 280) + '…' : ollamaMsg,

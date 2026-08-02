@@ -12,7 +12,7 @@ import type { AgentMode } from './agentModes.js';
 import {
 	FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, GROQ_VISION_MODEL,
 	OPENAI_BASE_URL, OPENAI_DEFAULT_MODEL, OPENROUTER_BASE_URL, OPENROUTER_DEFAULT_MODEL,
-	normalizeProvider, sanitizeGroqModelId,
+	OPENROUTER_MAX_TOKENS, normalizeProvider, sanitizeGroqModelId,
 } from './modelCatalog.js';
 import type { ModelProvider } from '../types.js';
 import { selectModelForTask } from './modelSelector.js';
@@ -63,7 +63,8 @@ export function settingsToConfig(model: ModelSettings, modelId?: string): ModelC
 			baseUrl: OPENROUTER_BASE_URL,
 			provider: 'openrouter',
 			apiKey: sanitizeApiKey(model.apiKey),
-			numPredict: 8192,
+			// OpenRouter pre-reserves credits for max_tokens — keep budget modest.
+			numPredict: OPENROUTER_MAX_TOKENS,
 		};
 	}
 
@@ -73,7 +74,7 @@ export function settingsToConfig(model: ModelSettings, modelId?: string): ModelC
 			baseUrl: OPENAI_BASE_URL,
 			provider: 'openai',
 			apiKey: sanitizeApiKey(model.apiKey),
-			numPredict: 8192,
+			numPredict: 4096,
 		};
 	}
 

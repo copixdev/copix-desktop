@@ -4,7 +4,10 @@ import { copix } from '../api.js';
 import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import type { TaskKind } from './modelCatalog.js';
-import { GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS, GROQ_VISION_MODEL, sanitizeGroqModelId } from './modelCatalog.js';
+import {
+	GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS, GROQ_VISION_MODEL,
+	OPENROUTER_MAX_TOKENS, OPENROUTER_MAX_TOKENS_FLOOR, parseOpenRouterAffordableTokens, sanitizeGroqModelId,
+} from './modelCatalog.js';
 import { inferTaskKind, isContinuationMessage, isReadOnlyTask } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
@@ -735,9 +738,12 @@ async function streamCompletion(
 
 	let maxTokens = config.provider === 'groq'
 		? Math.min(config.numPredict ?? GROQ_MAX_TOKENS, GROQ_MAX_TOKENS)
-		: (config.numPredict ?? 16384);
+		: config.provider === 'openrouter'
+			? Math.min(config.numPredict ?? OPENROUTER_MAX_TOKENS, OPENROUTER_MAX_TOKENS)
+			: (config.numPredict ?? 16384);
 	let lastError = '';
 	let rateLimitRetries = 0;
+	let creditRetries = 0;
 
 	for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
 		const modelId = modelCandidates[attempt]!;
@@ -821,6 +827,29 @@ async function streamCompletion(
 				if (signal.aborted) return { assistantText: '', toolCalls: new Map() };
 				attempt -= 1; // retry same model
 				continue;
+			}
+
+			// OpenRouter reserves credits for the full max_tokens budget. On 402, shrink and retry.
+			const creditLimited = res.status === 402
+				|| /requires more credits|can only afford|fewer max_tokens/i.test(message);
+			if (config.provider === 'openrouter' && creditLimited && creditRetries < 4) {
+				const afford = parseOpenRouterAffordableTokens(message);
+				const next = afford != null
+					? Math.max(OPENROUTER_MAX_TOKENS_FLOOR, Math.min(maxTokens - 1, Math.floor(afford * 0.85)))
+					: Math.max(OPENROUTER_MAX_TOKENS_FLOOR, Math.floor(maxTokens / 2));
+				if (next < maxTokens) {
+					creditRetries += 1;
+					maxTokens = next;
+					callbacks.onThinkingChunk?.(
+						`\n(OpenRouter credit reserve — retrying with max_tokens=${maxTokens}…)\n`,
+					);
+					attempt -= 1;
+					continue;
+				}
+				throw new Error(
+					`${lastError}\n\nCopix already lowered max_tokens. Add credits at https://openrouter.ai/settings/credits `
+					+ `or pick a cheaper model (e.g. Claude Sonnet / Llama).`,
+				);
 			}
 
 			if (config.provider === 'groq' && (modelMissing || tooLarge || rateLimited || badContent) && attempt < modelCandidates.length - 1) {

@@ -3,7 +3,7 @@
 import type { LineDiffStats } from './utils/lineDiff';
 import { looksLikeSecret } from './utils/secrets';
 
-export type ActivityKind = 'read' | 'edit' | 'search' | 'think' | 'run' | 'list' | 'create' | 'multitask' | 'subagent';
+export type ActivityKind = 'read' | 'edit' | 'search' | 'browse' | 'think' | 'run' | 'list' | 'create' | 'multitask' | 'subagent';
 
 export type ActivityPhase = 'active' | 'done';
 
@@ -90,6 +90,8 @@ const TOOL_KIND: Record<string, ActivityKind> = {
 	edit_file: 'edit',
 	delete_file: 'edit',
 	grep: 'search',
+	web_search: 'browse',
+	web_fetch: 'browse',
 	terminal: 'run',
 	run_terminal: 'run',
 	list_dir: 'list',
@@ -113,6 +115,10 @@ export function extractTarget(tool: string, args: Record<string, unknown>): stri
 			return args.path ? displayTarget(String(args.path)) : undefined;
 		case 'grep':
 			return args.pattern ? truncate(String(args.pattern), 56) : undefined;
+		case 'web_search':
+			return args.query ? truncate(String(args.query), 56) : undefined;
+		case 'web_fetch':
+			return args.url ? truncate(String(args.url), 56) : undefined;
 		case 'terminal':
 		case 'run_terminal':
 			return args.command ? truncate(String(args.command), 56) : undefined;
@@ -138,6 +144,10 @@ export function extractFullTarget(tool: string, args: Record<string, unknown>): 
 			return args.path ? String(args.path) : undefined;
 		case 'grep':
 			return args.pattern ? String(args.pattern) : undefined;
+		case 'web_search':
+			return args.query ? String(args.query) : undefined;
+		case 'web_fetch':
+			return args.url ? String(args.url) : undefined;
 		case 'terminal':
 		case 'run_terminal':
 			return args.command ? String(args.command) : undefined;
@@ -177,6 +187,10 @@ export function formatActivityDisplay(activity: ChatActivity): ActivityDisplay {
 			return activity.phase === 'active'
 				? { verb: 'Searching', target, ellipsis: true }
 				: { verb: 'Searched', target };
+		case 'browse':
+			return activity.phase === 'active'
+				? { verb: 'Browsing', target, ellipsis: true }
+				: { verb: 'Browsed', target };
 		case 'think': {
 			if (activity.phase === 'active') {
 				return isVisibleThought(activity)

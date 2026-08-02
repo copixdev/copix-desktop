@@ -21,6 +21,14 @@ const ACTION_ALIASES: Record<string, string> = {
 	append: 'append_file',
 	spawn_agent: 'spawn_subagent',
 	delegate: 'spawn_subagent',
+	search_web: 'web_search',
+	bing: 'web_search',
+	google: 'web_search',
+	browse: 'web_fetch',
+	browse_page: 'web_fetch',
+	fetch_url: 'web_fetch',
+	open_url: 'web_fetch',
+	read_url: 'web_fetch',
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -117,6 +125,22 @@ export function actionToTool(action: AgentAction): { tool: string; args: Record<
 					name: opt.name,
 					description: opt.description,
 					outputPath: opt.outputPath,
+				},
+			};
+		case 'web_search':
+			return {
+				tool,
+				args: {
+					query: opt.query ?? opt.q ?? opt.search ?? opt.detail,
+					max_results: opt.max_results ?? opt.limit,
+				},
+			};
+		case 'web_fetch':
+			return {
+				tool,
+				args: {
+					url: opt.url ?? opt.href ?? opt.link ?? opt.detail,
+					max_chars: opt.max_chars ?? opt.maxChars,
 				},
 			};
 		case 'multitask':

@@ -11,6 +11,7 @@ import {
 } from './modelCatalog.js';
 import { inferTaskKind, isContinuationMessage, isReadOnlyTask, isSimpleChatMessage } from './modelSelector.js';
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
+import { webFetch, webSearch } from './webBrowse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
 import { assertSafeFilePath } from '../utils/secrets.js';
 import { emitAgentTerminal } from '../utils/terminalBridge.js';
@@ -36,9 +37,14 @@ interface MultitaskItem {
 }
 
 const TERMINAL_TOOL_ALIASES = new Set(['terminal', 'run_terminal', 'shell', 'bash', 'exec', 'run_command']);
+const WEB_SEARCH_ALIASES = new Set(['web_search', 'search_web', 'bing', 'google']);
+const WEB_FETCH_ALIASES = new Set(['web_fetch', 'browse', 'browse_page', 'fetch_url', 'open_url', 'read_url']);
 
 function normalizeToolName(name: string): string {
-	return TERMINAL_TOOL_ALIASES.has(name) ? 'terminal' : name;
+	if (TERMINAL_TOOL_ALIASES.has(name)) return 'terminal';
+	if (WEB_SEARCH_ALIASES.has(name)) return 'web_search';
+	if (WEB_FETCH_ALIASES.has(name)) return 'web_fetch';
+	return name;
 }
 
 function fileStats(content: string): string {
@@ -47,7 +53,7 @@ function fileStats(content: string): string {
 	return `${lines} lines, ${bytes} bytes`;
 }
 
-const READ_ONLY_TOOL_NAMES = new Set(['read_file', 'list_dir', 'grep', 'multitask']);
+const READ_ONLY_TOOL_NAMES = new Set(['read_file', 'list_dir', 'grep', 'multitask', 'web_search', 'web_fetch']);
 const WRITE_TOOL_NAMES = new Set([
 	'create_project', 'write_file', 'append_file', 'edit_file', 'delete_file', 'terminal', 'run_terminal',
 ]);
@@ -89,7 +95,7 @@ If the user names a folder (e.g. ~/sites or /Users/…/sites), pass it as \`outp
 		function: {
 			name: 'multitask',
 			description: `## multitask
-Run **independent** tool calls in parallel (reads, greps, list_dir, terminal).
+Run **independent** tool calls in parallel (reads, greps, list_dir, terminal, web_search, web_fetch).
 
 **When to use:** Several lookups that do not depend on each other's results.
 
@@ -105,7 +111,10 @@ Run **independent** tool calls in parallel (reads, greps, list_dir, terminal).
 						items: {
 							type: 'object',
 							properties: {
-								tool: { type: 'string', enum: ['read_file', 'grep', 'list_dir', 'terminal'] },
+								tool: {
+									type: 'string',
+									enum: ['read_file', 'grep', 'list_dir', 'terminal', 'web_search', 'web_fetch'],
+								},
 								args: { type: 'object' },
 							},
 							required: ['tool'],
@@ -258,6 +267,52 @@ List files and folders in a directory.
 	{
 		type: 'function' as const,
 		function: {
+			name: 'web_search',
+			description: `## web_search
+Search the public web for current information (docs, APIs, errors, news, how-tos).
+
+**When to use:** You need up-to-date facts, library docs, release notes, or something not in the local workspace.
+
+**Parameters:**
+- \`query\` (required) — search string
+- \`max_results\` — number of results (default 5, max 8)`,
+			parameters: {
+				type: 'object',
+				properties: {
+					query: { type: 'string', description: 'Web search query' },
+					max_results: { type: 'number', description: 'How many results to return (1–8)' },
+				},
+				required: ['query'],
+			},
+		},
+	},
+	{
+		type: 'function' as const,
+		function: {
+			name: 'web_fetch',
+			description: `## web_fetch
+Fetch a public URL and return readable text (HTML stripped).
+
+**When to use:** After \`web_search\`, or when the user gives a docs/blog/GitHub URL to read.
+
+**Never use for:** \`localhost\`, private IPs, or file:// — those are blocked.
+
+**Parameters:**
+- \`url\` (required) — http(s) URL
+- \`max_chars\` — truncate body length (default ~12000)`,
+			parameters: {
+				type: 'object',
+				properties: {
+					url: { type: 'string', description: 'Public https URL to fetch' },
+					max_chars: { type: 'number', description: 'Max characters of extracted text' },
+				},
+				required: ['url'],
+			},
+		},
+	},
+	{
+		type: 'function' as const,
+		function: {
 			name: 'terminal',
 			description: `## terminal
 Run a **local shell command** on the user's machine (${shellLabel()}). Output streams live in Copix's integrated terminal.
@@ -334,6 +389,8 @@ const GROQ_TOOL_BLURBS: Record<string, string> = {
 	grep: 'Search file contents with ripgrep.',
 	list_dir: 'List files in a directory.',
 	terminal: 'Run a shell command for the CURRENT user request only — never echo/printf to chat, never re-run unrelated scripts.',
+	web_search: 'Search the public web (docs, errors, current info).',
+	web_fetch: 'Fetch a public URL and return readable text.',
 	spawn_subagent: 'RARE: spawn child agent only for hard multi-part parallel work — never for greetings or simple tasks.',
 };
 
@@ -627,6 +684,24 @@ async function executeTool(
 		}
 		case 'terminal':
 			return runTerminalCommand(args, ws);
+		case 'web_search': {
+			const query = String(args.query ?? args.q ?? args.search ?? '').trim();
+			const max = Number(args.max_results ?? args.limit ?? 5);
+			try {
+				return { result: await webSearch(query, max) };
+			} catch (err) {
+				return { result: `web_search failed: ${err instanceof Error ? err.message : String(err)}` };
+			}
+		}
+		case 'web_fetch': {
+			const url = String(args.url ?? args.href ?? args.link ?? '').trim();
+			const maxChars = Number(args.max_chars ?? args.maxChars ?? 12_000);
+			try {
+				return { result: await webFetch(url, maxChars) };
+			} catch (err) {
+				return { result: `web_fetch failed: ${err instanceof Error ? err.message : String(err)}` };
+			}
+		}
 		case 'spawn_subagent': {
 			const prompt = String(args.prompt ?? '').trim();
 			if (!prompt) return { result: 'spawn_subagent requires a prompt' };

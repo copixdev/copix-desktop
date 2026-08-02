@@ -24,6 +24,7 @@ export const DEFAULT_RULES = [
 	`Use the \`terminal\` tool only when shell commands are required for the **current** user request (build/test/install the thing they asked for — not unrelated scripts).`,
 	'**Never use `terminal` to talk to the user.** Do not `echo` / `printf` greetings or answers — reply in chat markdown instead.',
 	'For greetings and simple questions ("hello", "hi", "thanks"), reply in chat with **no tools**.',
+	'Use `web_search` / `web_fetch` when you need current docs, APIs, release notes, or a URL the user shared — do not invent web facts.',
 ];
 
 function hostOsRules(): string[] {
@@ -112,6 +113,8 @@ function toolGuidance(readOnly: boolean): string {
 | \`read_file\` | Read source files to understand the codebase |
 | \`list_dir\` | Explore folder structure |
 | \`grep\` | Search for symbols, patterns, or config |
+| \`web_search\` | Search the public web for docs / current info |
+| \`web_fetch\` | Open a public URL and read its text |
 | \`multitask\` | Parallel reads/searches only |
 
 Do **not** use write, delete, terminal, or create_project tools for this task.`;
@@ -129,8 +132,10 @@ Do **not** use write, delete, terminal, or create_project tools for this task.`;
 | \`delete_file\` | Remove a file |
 | \`grep\` | Search codebase (ripgrep) |
 | \`list_dir\` | Explore folder structure |
+| \`web_search\` | Search the public web (docs, APIs, errors, news) |
+| \`web_fetch\` | Fetch a public URL and return readable text |
 | \`terminal\` | Local shell — build, test, install only (\`elevate=true\` for admin/sudo). Never \`echo\` to chat. |
-| \`multitask\` | Parallel independent reads/searches |
+| \`multitask\` | Parallel independent reads/searches/web lookups |
 | \`spawn_subagent\` | **Rare** — only hard multi-part parallel work; never for chat, inspect, or small edits |
 
 ### File paths

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Copix — official AI IDE for macOS",
   "author": "EJH-BAE",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "homepage": "https://github.com/EJH-BAE/Copix",
   "main": "dist-electron/main.js",
   "type": "module",

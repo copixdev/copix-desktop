@@ -694,16 +694,10 @@ export function ChatCenter({
 			{!modelReady && (
 				<div className="banner banner-warn">
 					<span>
-						{modelProvider === 'ollama'
-							? 'Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models (qwen2.5-coder, mistral, qwen3.5)'
-							: modelProvider === 'groq'
-								? 'Groq not ready — add model.apiKey in ~/Copix/settings.json (free key at console.groq.com, no download needed)'
-								: modelProvider === 'openai'
-									? 'OpenAI not ready — add model.apiKey in ~/Copix/settings.json (key at platform.openai.com/api-keys)'
-									: 'Cloud provider not ready — Copix defaults to local Ollama; set model.provider to ollama in ~/Copix/settings.json'}
+						Ollama offline or models not ready — open Ollama, then click Check Ollama to pull Copix models (qwen2.5:3b, qwen2.5-coder, mistral, qwen3.5).
 					</span>
 					<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
-						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : modelProvider === 'ollama' ? 'Check Ollama' : modelProvider === 'groq' ? 'Check Groq' : modelProvider === 'openai' ? 'Check OpenAI' : 'Check Ollama'}
+						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : 'Check Ollama'}
 					</button>
 				</div>
 			)}

@@ -2513,7 +2513,31 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 .editor-tab.dirty .tab-name::after { content: ' •'; color: var(--accent-2); }
 .tab-x { border: none; background: none; color: var(--text-3); width: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tab-x:hover { color: var(--text); }
-.monaco-wrap { flex: 1; min-height: 0; }
+.monaco-wrap {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	position: relative;
+}
+.monaco-editor-host {
+	flex: 1;
+	min-height: 0;
+	position: relative;
+}
+.editor-lang-bar {
+	flex: 0 0 auto;
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 8px;
+	padding: 2px 10px;
+	font-size: 11px;
+	color: var(--text-3);
+	border-top: 1px solid var(--border);
+	background: var(--bg-1, var(--bg));
+	user-select: none;
+}
 .editor-placeholder {
 	height: 100%;
 	display: flex;

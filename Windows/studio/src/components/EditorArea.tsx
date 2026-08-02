@@ -10,6 +10,7 @@ import {
 	IconBranch, IconGlobe, IconTerminal, IconFile, IconFolder, IconChevron,
 } from './Icons';
 import { shellLabel } from '../utils/platform';
+import { languageFromPath, languageLabel } from '../utils/languageFromPath';
 
 export type SidePanelMode = 'hub' | 'changes' | 'terminal' | 'files' | 'browser';
 
@@ -47,17 +48,6 @@ function panelLabel(id: OpenableMode): string {
 	return PANEL_DEFS.find(d => d.id === id)?.label ?? id;
 }
 
-function lang(path: string): string {
-	if (path.endsWith('.tsx') || path.endsWith('.ts')) return 'typescript';
-	if (path.endsWith('.js') || path.endsWith('.jsx')) return 'javascript';
-	if (path.endsWith('.json')) return 'json';
-	if (path.endsWith('.css')) return 'css';
-	if (path.endsWith('.html')) return 'html';
-	if (path.endsWith('.md')) return 'markdown';
-	if (path.endsWith('.py')) return 'python';
-	return 'plaintext';
-}
-
 function shortPath(p?: string): string {
 	if (!p) return 'No folder';
 	const parts = p.replace(/\\/g, '/').split('/');
@@ -78,6 +68,7 @@ export function EditorArea({
 	const [plusQuery, setPlusQuery] = useState('');
 	const plusRef = useRef<HTMLDivElement>(null);
 	const active = tabs.find(t => t.path === activePath);
+	const activeLanguage = active ? languageFromPath(active.path) : 'plaintext';
 
 	useEffect(() => {
 		if (!modeProp) return;
@@ -316,29 +307,38 @@ export function EditorArea({
 						</div>
 						<div className="monaco-wrap">
 							{active ? (
-								<Editor
-									key={active.path}
-									height="100%"
-									language={lang(active.path)}
-									theme={theme === 'light' ? 'vs' : 'vs-dark'}
-									value={active.content}
-									onChange={v => onChange(active.path, v ?? '')}
-									options={{
-										fontSize: 13,
-										fontFamily: "'Cascadia Code', Consolas, monospace",
-										minimap: { enabled: true },
-										scrollBeyondLastLine: false,
-										padding: { top: 12 },
-										smoothScrolling: true,
-										bracketPairColorization: { enabled: true },
-										renderLineHighlight: 'line',
-										cursorBlinking: 'smooth',
-									}}
-								/>
+								<>
+									<div className="monaco-editor-host">
+										<Editor
+											key={`${active.path}:${activeLanguage}`}
+											height="100%"
+											path={active.path}
+											language={activeLanguage}
+											theme={theme === 'light' ? 'vs' : 'vs-dark'}
+											value={active.content}
+											onChange={v => onChange(active.path, v ?? '')}
+											options={{
+												fontSize: 13,
+												fontFamily: "'Cascadia Code', Consolas, 'IBM Plex Mono', monospace",
+												minimap: { enabled: true },
+												scrollBeyondLastLine: false,
+												padding: { top: 12 },
+												smoothScrolling: true,
+												bracketPairColorization: { enabled: true },
+												renderLineHighlight: 'line',
+												cursorBlinking: 'smooth',
+												automaticLayout: true,
+												wordBasedSuggestions: 'currentDocument',
+											}}
+										/>
+									</div>
+									<div className="editor-lang-bar" aria-label="Language">
+										<span>{languageLabel(activeLanguage)}</span>
+									</div>
+								</>
 							) : (
 								<div className="editor-placeholder ide-empty">
 									<div className="ide-empty-icon"><IconFile width={28} height={28} /></div>
-									<p>VS Code–style editor</p>
 									<p className="muted-xs">Open a folder, then pick a file from the tree</p>
 									<div className="btn-row" style={{ justifyContent: 'center' }}>
 										<button type="button" className="btn primary sm" onClick={onOpenFolder}>

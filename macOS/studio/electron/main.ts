@@ -338,8 +338,12 @@ function agentsDir(): string {
 
 async function listTree(dir: string, max = 800): Promise<string[]> {
 	const out: string[] = [];
+	// User-home workspaces stay shallow so the file tree stays usable.
+	const home = path.resolve(app.getPath('home'));
+	const root = path.resolve(dir);
+	const maxDepth = root === home ? 2 : 8;
 	async function walk(current: string, depth: number): Promise<void> {
-		if (out.length >= max || depth > 8) return;
+		if (out.length >= max || depth > maxDepth) return;
 		let entries;
 		try { entries = await fs.readdir(current, { withFileTypes: true }); } catch { return; }
 		for (const e of entries) {

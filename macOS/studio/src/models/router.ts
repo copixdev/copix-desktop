@@ -5,6 +5,7 @@ import type { AgentMode } from './agentModes.js';
 import { buildSystemPrompt } from './systemPrompt.js';
 import type { TaskKind } from './modelCatalog.js';
 import {
+	FALLBACK_MODEL_ID,
 	GROQ_FALLBACK_MODEL, GROQ_MAX_TOKENS, GROQ_MAX_TOKENS_RETRY, GROQ_MODEL_FALLBACKS, GROQ_VISION_MODEL,
 	OPENROUTER_MAX_TOKENS, OPENROUTER_MAX_TOKENS_FLOOR, parseOpenRouterAffordableTokens, sanitizeGroqModelId,
 } from './modelCatalog.js';
@@ -724,7 +725,9 @@ async function streamCompletion(
 			...GROQ_MODEL_FALLBACKS.map(sanitizeGroqModelId),
 			GROQ_FALLBACK_MODEL,
 		])]
-		: [config.model];
+		: config.provider === 'ollama'
+			? [...new Set([config.model, FALLBACK_MODEL_ID])]
+			: [config.model];
 
 	let maxTokens = config.provider === 'groq'
 		? Math.min(config.numPredict ?? GROQ_MAX_TOKENS, GROQ_MAX_TOKENS)
@@ -844,6 +847,12 @@ async function streamCompletion(
 
 			if (config.provider === 'groq' && (modelMissing || tooLarge || rateLimited || badContent) && attempt < modelCandidates.length - 1) {
 				if (tooLarge || rateLimited) maxTokens = GROQ_MAX_TOKENS_RETRY;
+				continue;
+			}
+			if (config.provider === 'ollama' && modelMissing && attempt < modelCandidates.length - 1) {
+				callbacks.onThinkingChunk?.(
+					`\n(model ${modelId} missing — retrying with ${modelCandidates[attempt + 1]}…)\n`,
+				);
 				continue;
 			}
 			throw new Error(lastError);

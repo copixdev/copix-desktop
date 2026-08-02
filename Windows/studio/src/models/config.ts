@@ -167,6 +167,6 @@ export async function checkModelHealth(config: ModelConfig): Promise<{ ok: boole
 		if (has) return { ok: true, message: `Ollama · ${config.model} ready` };
 		return { ok: false, message: `Model ${config.model} not pulled — run ollama pull ${config.model}` };
 	} catch {
-		return { ok: false, message: 'Ollama offline — install from ollama.com or switch to model.provider groq' };
+		return { ok: false, message: 'Ollama offline — install from ollama.com, then run ollama pull qwen2.5:3b' };
 	}
 }

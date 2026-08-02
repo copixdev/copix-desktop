@@ -150,7 +150,7 @@ function AssistantTurn({
 					)}
 					{showPlaceholder && (
 						<div className="msg-body assistant muted">
-							<p className="assistant-empty">No response from the model. Check Groq/Ollama status and try again.</p>
+							<p className="assistant-empty">No response from the model. Check Ollama status and try again.</p>
 						</div>
 					)}
 					{!live && !isError && (showContent || showPlaceholder || (activities?.length ?? 0) > 0) && (
@@ -694,16 +694,16 @@ export function ChatCenter({
 			{!modelReady && (
 				<div className="banner banner-warn">
 					<span>
-						{modelProvider === 'groq'
-							? 'Groq not ready — add model.apiKey in ~/Copix/settings.json (free key at console.groq.com, no download needed)'
-							: modelProvider === 'openrouter'
-								? 'OpenRouter not ready — add model.apiKey in ~/Copix/settings.json (key at openrouter.ai/keys; unlocks Claude Opus, GPT, Gemini)'
+						{modelProvider === 'ollama'
+							? 'Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models (qwen2.5-coder, mistral, qwen3.5)'
+							: modelProvider === 'groq'
+								? 'Groq not ready — add model.apiKey in ~/Copix/settings.json (free key at console.groq.com, no download needed)'
 								: modelProvider === 'openai'
 									? 'OpenAI not ready — add model.apiKey in ~/Copix/settings.json (key at platform.openai.com/api-keys)'
-									: 'Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models (qwen2.5-coder, mistral, qwen3.5)'}
+									: 'Cloud provider not ready — Copix defaults to local Ollama; set model.provider to ollama in ~/Copix/settings.json'}
 					</span>
 					<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
-						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : modelProvider === 'groq' ? 'Check Groq' : modelProvider === 'openrouter' ? 'Check OpenRouter' : modelProvider === 'openai' ? 'Check OpenAI' : 'Check Ollama'}
+						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : modelProvider === 'ollama' ? 'Check Ollama' : modelProvider === 'groq' ? 'Check Groq' : modelProvider === 'openai' ? 'Check OpenAI' : 'Check Ollama'}
 					</button>
 				</div>
 			)}
@@ -962,10 +962,14 @@ export function ChatCenter({
 							className="composer-input"
 							placeholder={
 								!modelReady
-									? 'Set up your Copix model to start chatting…'
+									? (modelProvider === 'ollama'
+										? 'Start Ollama to chat…'
+										: 'Set up your Copix model to start chatting…')
 									: messages.length
 										? 'Send follow-up'
-										: 'Ask Copix… (@ files, / commands, paste images)'
+										: (modelProvider === 'ollama'
+											? 'Ask Copix via Ollama… (@ files, / commands, paste images)'
+											: 'Ask Copix… (@ files, / commands, paste images)')
 							}
 							value={input}
 							disabled={running || !workspace || !modelReady}

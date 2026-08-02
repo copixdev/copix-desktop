@@ -33,14 +33,31 @@ function folderName(p: string): string {
 	return parts[parts.length - 1] || p;
 }
 
+function isSandboxLeaf(name: string): boolean {
+	return /^agent-\d+/i.test(name.trim());
+}
+
+/** Prefer a real workspace folder leaf over `.copix/sessions/agent-*` sandboxes. */
+function workspaceLeafTitle(root?: string): string | undefined {
+	if (!root?.trim()) return undefined;
+	const parts = root.replace(/\\/g, '/').split('/').filter(Boolean);
+	for (let i = parts.length - 1; i >= 0; i--) {
+		const part = parts[i];
+		if (!part || isSandboxLeaf(part)) continue;
+		if (part === 'sessions' || part === '.copix' || part === 'agent-workspaces') continue;
+		return part;
+	}
+	return undefined;
+}
+
 function agentTitle(s: ChatSession): string {
 	const title = s.title?.trim();
-	if (title && title !== 'New agent' && !/^agent-\d+/i.test(title)) return title;
-	if (s.workspaceRoot) {
-		const name = folderName(s.workspaceRoot);
-		if (name && !/^agent-\d+/i.test(name)) return name;
-	}
-	return title || 'New agent';
+	const leaf = workspaceLeafTitle(s.workspaceRoot);
+	// Sandbox titles (agent-123…) always yield to the workspace folder name.
+	if (title && title !== 'New agent' && !isSandboxLeaf(title)) return title;
+	if (leaf) return leaf;
+	if (title && !isSandboxLeaf(title)) return title;
+	return 'New agent';
 }
 
 function relativeTime(ts: number): string {

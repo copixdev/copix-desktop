@@ -25,10 +25,24 @@ async function ensureWorkspace(session: ChatSession): Promise<ChatSession> {
 	const isLegacySandbox = /\/\.copix\/sessions\//i.test(normalized)
 		|| /\/agent-workspaces\//i.test(normalized)
 		|| /^agent-\d+$/i.test(leaf);
-	if (session.workspaceRoot && !isLegacySandbox) return session;
+	const sandboxTitle = !session.title?.trim()
+		|| session.title === 'New agent'
+		|| /^agent-\d+/i.test(session.title);
+	if (session.workspaceRoot && !isLegacySandbox) {
+		if (!sandboxTitle) return session;
+		const homeLeaf = session.workspaceRoot.replace(/\\/g, '/').split('/').filter(Boolean).pop();
+		return homeLeaf && homeLeaf !== session.title
+			? { ...session, title: homeLeaf }
+			: session;
+	}
 	// New agents (and old session sandboxes) use the user home so the whole machine is reachable.
 	const ws = await copix.createSessionWorkspace(session.id);
-	return { ...session, workspaceRoot: ws.root };
+	const homeLeaf = ws.root.replace(/\\/g, '/').split('/').filter(Boolean).pop();
+	return {
+		...session,
+		workspaceRoot: ws.root,
+		...(sandboxTitle && homeLeaf ? { title: homeLeaf } : {}),
+	};
 }
 
 function AppInner() {

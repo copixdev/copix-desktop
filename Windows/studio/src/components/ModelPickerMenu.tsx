@@ -9,6 +9,7 @@ import {
 	OPENAI_FEATURED_MODELS,
 	OPENROUTER_FEATURED_MODELS,
 	defaultCloudModel,
+	modelIsAvailable,
 	normalizeProvider,
 	sanitizeGroqModelId,
 } from '../models/modelCatalog';
@@ -88,17 +89,25 @@ export function buildModelOptions(settings: ModelSettings, installed: string[] =
 		}));
 	}
 
-	const preferred = uniqueIds([
+	// Ollama (forced default): lead with installed local models — never OpenRouter featured.
+	const installedIds = uniqueIds(installed);
+	const catalogIds = uniqueIds([
 		...Object.values(MODE_MODEL_PREFERENCE),
 		FALLBACK_MODEL_ID,
 		settings.modelId,
-		...installed,
 	]);
-	return preferred.map(id => ({
-		id,
-		label: prettyLabel(id),
-		detail: shortDetail(id) ?? (installed.some(n => n === id || n.startsWith(`${id.split(':')[0]}:`)) ? 'Installed' : 'Pull'),
-	}));
+	const preferred = uniqueIds([
+		...installedIds,
+		...catalogIds,
+	]);
+	return preferred.map(id => {
+		const installedHere = modelIsAvailable(id, installed);
+		return {
+			id,
+			label: prettyLabel(id),
+			detail: installedHere ? 'Installed' : (shortDetail(id) ?? 'Pull'),
+		};
+	});
 }
 
 export function ModelPickerMenu({ settings, installed = [], onChange, onClose, className }: Props) {
@@ -106,6 +115,7 @@ export function ModelPickerMenu({ settings, installed = [], onChange, onClose, c
 	const rootRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const normalized = normalizeModelSettings(settings);
+	const provider = normalizeProvider(settings.provider);
 	const auto = normalized.selection !== 'manual';
 	const options = useMemo(() => buildModelOptions(settings, installed), [settings, installed]);
 	const filtered = useMemo(() => {
@@ -117,6 +127,9 @@ export function ModelPickerMenu({ settings, installed = [], onChange, onClose, c
 			|| (o.detail?.toLowerCase().includes(q) ?? false),
 		);
 	}, [options, query]);
+	const ollamaInstalledCount = provider === 'ollama'
+		? options.filter(o => o.detail === 'Installed').length
+		: 0;
 
 	useEffect(() => {
 		inputRef.current?.focus();
@@ -158,7 +171,7 @@ export function ModelPickerMenu({ settings, installed = [], onChange, onClose, c
 			<input
 				ref={inputRef}
 				className="model-picker-search"
-				placeholder="Search models"
+				placeholder={provider === 'ollama' ? 'Search installed Ollama models' : 'Search models'}
 				value={query}
 				onChange={e => setQuery(e.target.value)}
 			/>
@@ -175,6 +188,13 @@ export function ModelPickerMenu({ settings, installed = [], onChange, onClose, c
 					<span className="model-picker-toggle-knob" />
 				</button>
 			</div>
+			{provider === 'ollama' && (
+				<div className="model-picker-empty">
+					{ollamaInstalledCount
+						? `Installed Ollama models (${ollamaInstalledCount})`
+						: 'No Ollama models installed yet — pull qwen2.5:3b'}
+				</div>
+			)}
 			<div className="model-picker-list">
 				{filtered.map(opt => {
 					const selected = !auto && normalized.modelId === opt.id;
@@ -195,7 +215,9 @@ export function ModelPickerMenu({ settings, installed = [], onChange, onClose, c
 					);
 				})}
 				{!filtered.length && (
-					<div className="model-picker-empty">No models match</div>
+					<div className="model-picker-empty">
+						{provider === 'ollama' ? 'No Ollama models match' : 'No models match'}
+					</div>
 				)}
 			</div>
 		</div>

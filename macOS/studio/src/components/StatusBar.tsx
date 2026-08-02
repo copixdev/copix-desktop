@@ -7,7 +7,18 @@ interface Props {
 	online: boolean;
 }
 
+function providerLabel(provider: NonNullable<Props['provider']>): string {
+	switch (provider) {
+		case 'ollama': return 'Ollama';
+		case 'groq': return 'Groq';
+		case 'openrouter': return 'OpenRouter';
+		case 'openai': return 'OpenAI';
+		default: return 'Ollama';
+	}
+}
+
 export function StatusBar({ workspace, model, provider = 'ollama', online }: Props) {
+	const modelLabel = `${providerLabel(provider)} · ${model}`;
 	return (
 		<footer className="statusbar">
 			<div className="statusbar-left">
@@ -21,8 +32,7 @@ export function StatusBar({ workspace, model, provider = 'ollama', online }: Pro
 			<div className="statusbar-right">
 				<span className="status-item" title="Model from ~/Copix/settings.json">
 					<span className={`status-dot ${online ? 'on' : 'off'}`} />
-					{model}
-					<span className="status-sub">{provider}</span>
+					{modelLabel}
 				</span>
 			</div>
 		</footer>

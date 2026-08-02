@@ -24,6 +24,7 @@ const DEBUG_RE = /\b(fix|debug|error|bug|broken|fail(?:s|ed|ing)?|issue|crash|ex
 const TERMINAL_RE = /\b(run|install|npm|pnpm|yarn|brew|git|terminal|command|execute|shell|build|test|compile)\b/i;
 const IMPLEMENT_RE = /\b(create|implement|add feature|scaffold|new app|new project|new (python |js |ts )?script|write (a |me )?(new )?|build me|make (me |a |an )?|generate|enhance|improve|extend|update|modify|refactor|simulation|pygame)\b/i;
 const CONTINUATION_RE = /^(yes|yeah|yep|yup|ok|okay|sure|go ahead|continue|proceed|do it|create|yes create|enhance|keep going|finish( it)?|complete( it)?|do that|make it|add that|go on|carry on|please do|do so)\.?!?\s*$/i;
+const GREETING_RE = /^(hi|hello|hey|yo|sup|howdy|good (morning|afternoon|evening)|thanks|thank you|thx|hola|你好)\.?!?\s*$/i;
 
 export function isContinuationMessage(userMessage: string): boolean {
 	return CONTINUATION_RE.test(userMessage.trim());
@@ -32,6 +33,7 @@ export function isContinuationMessage(userMessage: string): boolean {
 export function inferTaskKind(userMessage: string, agentMode: AgentMode): TaskKind {
 	const msg = userMessage.trim();
 	if (!msg) return agentMode === 'plan' ? 'plan' : agentMode === 'terminal' ? 'terminal' : 'general';
+	if (GREETING_RE.test(msg)) return 'general';
 
 	if (isContinuationMessage(msg)) {
 		if (agentMode === 'debug') return 'debug';
@@ -70,19 +72,31 @@ function pickGroqModel(candidates: string[]): string {
 	return GROQ_FALLBACK_MODEL;
 }
 
-function pickOllamaModel(candidates: string[], installed: string[], lowVram: boolean): string {
+function pickOllamaModel(
+	candidates: string[],
+	installed: string[],
+	lowVram: boolean,
+	settingsModelId?: string,
+): string {
+	// Unknown install list — never stretch to models that may 404.
+	if (installed.length === 0) {
+		return settingsModelId?.trim() || FALLBACK_MODEL_ID;
+	}
+
 	const seen = new Set<string>();
 	const ordered = lowVram
-		? [...candidates, 'qwen3.5:4b', FALLBACK_MODEL_ID]
-		: [...candidates, 'qwen3.5:4b', 'qwen2.5-coder:7b', 'mistral:7b', FALLBACK_MODEL_ID];
+		? [...candidates, settingsModelId, 'qwen3.5:4b', FALLBACK_MODEL_ID]
+		: [...candidates, settingsModelId, FALLBACK_MODEL_ID, 'qwen3.5:4b', 'qwen2.5-coder:7b', 'mistral:7b'];
 
 	for (const id of ordered) {
-		if (seen.has(id)) continue;
+		if (!id || seen.has(id)) continue;
 		seen.add(id);
 		if (modelIsAvailable(id, installed)) return id;
 	}
 
-	return modelIsAvailable(FALLBACK_MODEL_ID, installed) ? FALLBACK_MODEL_ID : candidates[0] ?? FALLBACK_MODEL_ID;
+	if (settingsModelId && modelIsAvailable(settingsModelId, installed)) return settingsModelId;
+	if (modelIsAvailable(FALLBACK_MODEL_ID, installed)) return FALLBACK_MODEL_ID;
+	return installed[0]!;
 }
 
 /** Pick the model tag for this agent turn. */
@@ -122,7 +136,12 @@ export function selectModelForTask(
 		? TASK_MODEL_PREFERENCE[taskKind]
 		: MODE_MODEL_PREFERENCE[agentMode] ?? FALLBACK_MODEL_ID;
 
-	return pickOllamaModel([preferred], installed, Boolean(normalized.lowVram));
+	return pickOllamaModel(
+		[preferred, normalized.modelId || FALLBACK_MODEL_ID],
+		installed,
+		Boolean(normalized.lowVram),
+		normalized.modelId || FALLBACK_MODEL_ID,
+	);
 }
 
 export function preferredModelForTask(

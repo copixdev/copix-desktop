@@ -1,23 +1,38 @@
-import type { CopixApi, TrainingStatus, SetupProgress } from '../electron/preload';
+import type { CopixApi } from '../electron/preload';
 import type { AppSettings } from './types';
-
-export type { TrainingStatus, SetupProgress };
 
 declare global {
 	interface Window {
 		copix: CopixApi;
 	}
+	// eslint-disable-next-line no-var
+	var copix: CopixApi | undefined;
+}
+
+function resolveCopixApi(): CopixApi | undefined {
+	const g = globalThis as typeof globalThis & {
+		copix?: CopixApi;
+		window?: { copix?: CopixApi };
+	};
+	return g.copix ?? g.window?.copix;
 }
 
 function missingCopixApi(): never {
-	const msg = 'Copix preload API unavailable — restart the app (npm run dev or copix-studio.bat)';
+	const msg = 'Copix API unavailable — restart the desktop app or reinstall the CLI (cli/install.sh)';
 	console.error('[copix]', msg);
 	throw new Error(msg);
 }
 
-export const copix: CopixApi = window.copix ?? new Proxy({} as CopixApi, {
-	get() {
-		return () => missingCopixApi();
+/** Works in Electron renderer (window.copix) and Node CLI (globalThis.copix). */
+export const copix: CopixApi = new Proxy({} as CopixApi, {
+	get(_target, prop, receiver) {
+		const api = resolveCopixApi();
+		if (!api) {
+			if (prop === 'platform') return 'darwin';
+			return () => missingCopixApi();
+		}
+		const value = Reflect.get(api, prop, receiver);
+		return typeof value === 'function' ? value.bind(api) : value;
 	},
 });
 

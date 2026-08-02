@@ -1,4 +1,4 @@
-/** Host platform helpers for Copix Studio (macOS-first). */
+/** Host platform helpers for Copix Studio (desktop + CLI). */
 
 export type HostPlatform = 'darwin' | 'win32' | 'linux' | string;
 
@@ -7,12 +7,21 @@ let cached: HostPlatform | null = null;
 export function getHostPlatform(): HostPlatform {
 	if (cached) return cached;
 	try {
-		const p = window.copix?.getPlatform?.() ?? window.copix?.platform;
+		const g = globalThis as typeof globalThis & {
+			copix?: { getPlatform?: () => string; platform?: string };
+			window?: { copix?: { getPlatform?: () => string; platform?: string } };
+		};
+		const api = g.copix ?? g.window?.copix;
+		const p = api?.getPlatform?.() ?? api?.platform;
 		if (typeof p === 'string' && p) {
 			cached = p;
 			return cached;
 		}
 	} catch { /* fall through */ }
+	if (typeof process !== 'undefined' && typeof process.platform === 'string') {
+		cached = process.platform;
+		return cached;
+	}
 	cached = 'darwin';
 	return cached;
 }

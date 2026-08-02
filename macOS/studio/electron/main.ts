@@ -791,6 +791,22 @@ app.whenReady().then(() => {
 		await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), 'utf8');
 	});
 
+	// Shared agent history (~/Copix/sessions.json) — synced between Desktop and CLI.
+	ipcMain.handle('copix:loadChatSessions', async () => {
+		try {
+			const file = path.join(copixDir(), 'sessions.json');
+			if (!fsSync.existsSync(file)) return null;
+			return await fs.readFile(file, 'utf8');
+		} catch {
+			return null;
+		}
+	});
+
+	ipcMain.handle('copix:saveChatSessions', async (_e, json: string) => {
+		ensureCopixDir();
+		await fs.writeFile(path.join(copixDir(), 'sessions.json'), json, 'utf8');
+	});
+
 	ipcMain.handle('copix:getProjectsRoot', async () => {
 		const root = projectsRoot();
 		await fs.mkdir(root, { recursive: true });

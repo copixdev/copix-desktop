@@ -37,6 +37,8 @@ const api = {
 	},
 	getSettings: () => ipcRenderer.invoke('copix:getSettings'),
 	setSettings: (s: unknown) => ipcRenderer.invoke('copix:setSettings', s),
+	loadChatSessions: () => ipcRenderer.invoke('copix:loadChatSessions') as Promise<string | null>,
+	saveChatSessions: (json: string) => ipcRenderer.invoke('copix:saveChatSessions', json) as Promise<void>,
 	openExternal: (url: string) => ipcRenderer.invoke('copix:openExternal', url),
 	openIdeWindow: () => ipcRenderer.invoke('copix:openIdeWindow'),
 	getServerStatus: () => ipcRenderer.invoke('copix:getServerStatus') as Promise<ServerStatus>,

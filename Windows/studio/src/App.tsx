@@ -8,7 +8,7 @@ import { Sidebar } from './components/Sidebar';
 import { SubagentDock } from './components/SubagentDock';
 import { StatusBar } from './components/StatusBar';
 import { ToastProvider } from './components/Toast';
-import { loadSessions, newSession, saveSessions, updateSession, clearAllChatData, ChatSession, titleFromMessage } from './hooks/chatSessions';
+import { loadSessions, mergeSessionStores, newSession, saveSessions, syncSessionsFromDisk, updateSession, clearAllChatData, ChatSession, titleFromMessage } from './hooks/chatSessions';
 import { DEFAULT_SETTINGS, AppSettings } from './types';
 import { inferWorkspaceEnv } from './models/agentModes';
 import { resolveModelConfig } from './models/config';
@@ -116,6 +116,30 @@ function AppInner() {
 	}, [bootMode]);
 
 	useEffect(() => { saveSessions(sessions); }, [sessions]);
+
+	// Merge CLI history (~/Copix/sessions.json) on launch and whenever the window refocuses.
+	useEffect(() => {
+		let cancelled = false;
+		const sync = () => {
+			setSessions(prev => {
+				syncSessionsFromDisk(prev).then(merged => {
+					if (!cancelled && merged) {
+						setSessions(cur => {
+							const again = mergeSessionStores(cur, merged);
+							return JSON.stringify(again) === JSON.stringify(cur) ? cur : again;
+						});
+					}
+				});
+				return prev;
+			});
+		};
+		sync();
+		window.addEventListener('focus', sync);
+		return () => {
+			cancelled = true;
+			window.removeEventListener('focus', sync);
+		};
+	}, []);
 
 	useEffect(() => {
 		copix.getSettings().then(s => {

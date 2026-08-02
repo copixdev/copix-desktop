@@ -13,7 +13,7 @@ import {
 	normalizeProvider,
 	startupPullModels,
 } from '../src/models/modelCatalog.js';
-import { GROQ_BASE_URL } from '../src/models/modelCatalog.js';
+import { GROQ_BASE_URL, OPENAI_BASE_URL, OPENROUTER_BASE_URL } from '../src/models/modelCatalog.js';
 import {
 	isSensitiveWorkspacePath,
 	shouldHideWorkspaceEntry,
@@ -92,12 +92,19 @@ function readModelSettingsFromDisk(): { provider?: string; apiKey?: string } {
 	}
 }
 
-async function fetchGroqStatus(): Promise<{ online: boolean; hasModel: boolean }> {
+const CLOUD_BASE_URLS: Record<string, string> = {
+	groq: GROQ_BASE_URL,
+	openrouter: OPENROUTER_BASE_URL,
+	openai: OPENAI_BASE_URL,
+};
+
+async function fetchCloudStatus(provider: string): Promise<{ online: boolean; hasModel: boolean }> {
 	const { apiKey } = readModelSettingsFromDisk();
 	const key = apiKey?.trim();
 	if (!key || /gsk_YOUR_KEY_HERE/i.test(key)) return { online: false, hasModel: false };
+	const baseUrl = CLOUD_BASE_URLS[provider] ?? GROQ_BASE_URL;
 	try {
-		const res = await fetch(`${GROQ_BASE_URL}/models`, {
+		const res = await fetch(`${baseUrl}/models`, {
 			headers: {
 				Authorization: `Bearer ${key}`,
 				'Content-Type': 'application/json',
@@ -139,14 +146,14 @@ async function fetchServerHealth(): Promise<{
 	const modelSettings = readModelSettingsFromDisk();
 	const provider = normalizeProvider(modelSettings.provider);
 
-	if (provider === 'groq') {
-		const g = await fetchGroqStatus();
+	if (provider !== 'ollama') {
+		const g = await fetchCloudStatus(provider);
 		return {
 			online: g.online,
 			hasModel: g.hasModel,
-			models: g.online ? ['groq-cloud'] : [],
+			models: g.online ? [`${provider}-cloud`] : [],
 			missing: [],
-			provider: 'groq',
+			provider,
 		};
 	}
 
@@ -162,16 +169,23 @@ async function fetchServerHealth(): Promise<{
 
 async function ensureCopixModelsInternal(full = false): Promise<{ ok: boolean; message: string; pulled: string[] }> {
 	const modelSettings = readModelSettingsFromDisk();
-	if (normalizeProvider(modelSettings.provider) === 'groq') {
-		const g = await fetchGroqStatus();
+	const diskProvider = normalizeProvider(modelSettings.provider);
+	if (diskProvider !== 'ollama') {
+		const keyHint = diskProvider === 'groq'
+			? 'free key at console.groq.com'
+			: diskProvider === 'openrouter'
+				? 'key at openrouter.ai/keys'
+				: 'key at platform.openai.com/api-keys';
+		const g = await fetchCloudStatus(diskProvider);
 		if (!g.online) {
 			return {
 				ok: false,
-				message: 'Add model.apiKey in ~/Copix/settings.json — free key at console.groq.com',
+				message: `Add model.apiKey in ~/Copix/settings.json — ${keyHint}`,
 				pulled: [],
 			};
 		}
-		return { ok: true, message: 'Groq cloud ready — no local download needed', pulled: [] };
+		const label = diskProvider === 'groq' ? 'Groq' : diskProvider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
+		return { ok: true, message: `${label} cloud ready — no local download needed`, pulled: [] };
 	}
 
 	const s = await fetchOllamaStatus();

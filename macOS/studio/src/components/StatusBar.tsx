@@ -3,7 +3,7 @@ import { IconFolder } from './Icons';
 interface Props {
 	workspace?: string;
 	model: string;
-	provider?: 'ollama' | 'groq';
+	provider?: 'ollama' | 'groq' | 'openrouter' | 'openai';
 	online: boolean;
 }
 

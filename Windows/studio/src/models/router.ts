@@ -403,7 +403,8 @@ function contentPartsToText(content: string | ContentPart[] | null | undefined):
 }
 
 function modelSupportsVision(modelId: string): boolean {
-	return modelId === GROQ_VISION_MODEL || /scout|vision|llava|pixtral/i.test(modelId);
+	return modelId === GROQ_VISION_MODEL
+		|| /scout|vision|llava|pixtral|claude|gpt-4o|gpt-4\.1|gpt-5|gemini|\bo3\b|omni/i.test(modelId);
 }
 
 /** Groq rejects non-string content on non-vision models (and null content on tool turns). */
@@ -715,7 +716,11 @@ async function streamCompletion(
 		callbacks.onThinkingEnd();
 	};
 
-	const providerLabel = config.provider === 'groq' ? 'Groq' : 'Ollama';
+	const PROVIDER_LABELS: Record<string, string> = {
+		groq: 'Groq', openrouter: 'OpenRouter', openai: 'OpenAI', ollama: 'Ollama',
+	};
+	const providerLabel = PROVIDER_LABELS[config.provider] ?? 'Ollama';
+	const isCloud = config.provider !== 'ollama';
 	if (config.provider === 'groq') {
 		config.model = sanitizeGroqModelId(config.model);
 	}
@@ -737,11 +742,17 @@ async function streamCompletion(
 	for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
 		const modelId = modelCandidates[attempt]!;
 		const normalizedMessages = normalizeMessagesForModel(messages, modelId);
-		const requestBody = config.provider === 'groq'
+		const requestBody = isCloud
 			? {
 				model: modelId,
 				messages: normalizedMessages,
-				...(opts.tools ? { tools: opts.tools, parallel_tool_calls: false, tool_choice: 'auto' } : {}),
+				...(opts.tools
+					? {
+						tools: opts.tools,
+						tool_choice: 'auto',
+						...(config.provider === 'groq' ? { parallel_tool_calls: false } : {}),
+					}
+					: {}),
 				stream: true,
 				temperature: 0.05,
 				max_tokens: maxTokens,
@@ -791,9 +802,9 @@ async function streamCompletion(
 			const badContent = res.status === 400
 				&& /content must be a string|invalid.*message|only one tool call/i.test(message);
 
-			if (config.provider === 'groq' && rateLimited && rateLimitRetries < 2) {
+			if (isCloud && rateLimited && rateLimitRetries < 2) {
 				rateLimitRetries += 1;
-				maxTokens = GROQ_MAX_TOKENS_RETRY;
+				if (config.provider === 'groq') maxTokens = GROQ_MAX_TOKENS_RETRY;
 				const waitMatch = message.match(/try again in\s*([\d.]+)\s*s/i);
 				const waitMs = Math.min(
 					45_000,
@@ -994,7 +1005,7 @@ export async function runAgent(
 						});
 						continue;
 					}
-					throw new Error(`${config.provider === 'groq' ? 'Groq' : 'Ollama'} returned an empty reply. Try again or pick another model.`);
+					throw new Error(`${config.provider === 'ollama' ? 'Ollama' : config.provider} returned an empty reply. Try again or pick another model.`);
 				}
 				if (
 					!isReadOnlyTask(taskKind)

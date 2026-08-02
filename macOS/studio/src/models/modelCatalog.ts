@@ -89,8 +89,52 @@ export function sanitizeGroqModelId(modelId: string): string {
 export const GROQ_MAX_TOKENS = 1536;
 export const GROQ_MAX_TOKENS_RETRY = 768;
 
+/** OpenRouter — one paid key for frontier models (Claude Opus, GPT, Gemini). */
+export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+/** `~family-latest` aliases always resolve to the newest version on OpenRouter. */
+export const OPENROUTER_DEFAULT_MODEL = '~anthropic/claude-opus-latest';
+
+export const OPENROUTER_FEATURED_MODELS = [
+	{ id: '~anthropic/claude-opus-latest', label: 'Claude Opus', detail: 'Latest · Best' },
+	{ id: '~anthropic/claude-sonnet-latest', label: 'Claude Sonnet', detail: 'Latest · Fast' },
+	{ id: 'anthropic/claude-opus-5', label: 'Claude Opus 5', detail: 'Pinned' },
+	{ id: 'openai/gpt-4o', label: 'GPT-4o', detail: 'OpenAI' },
+	{ id: 'openai/gpt-4.1', label: 'GPT-4.1', detail: 'OpenAI' },
+	{ id: 'openai/o3', label: 'o3', detail: 'Reasoning' },
+	{ id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', detail: 'Google' },
+	{ id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', detail: 'Cheap' },
+] as const;
+
+/** Direct OpenAI API. */
+export const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+export const OPENAI_DEFAULT_MODEL = 'gpt-4o';
+
+export const OPENAI_FEATURED_MODELS = [
+	{ id: 'gpt-4o', label: 'GPT-4o', detail: 'Default' },
+	{ id: 'gpt-4.1', label: 'GPT-4.1', detail: 'Coding' },
+	{ id: 'o3', label: 'o3', detail: 'Reasoning' },
+	{ id: 'gpt-4o-mini', label: 'GPT-4o mini', detail: 'Cheap' },
+] as const;
+
+/** Cloud providers that speak the OpenAI chat-completions protocol with a Bearer key. */
+export const CLOUD_PROVIDERS: ReadonlySet<ModelProvider> = new Set(['groq', 'openrouter', 'openai']);
+
+export function isCloudProvider(provider?: string): boolean {
+	return CLOUD_PROVIDERS.has(normalizeProvider(provider));
+}
+
+export function defaultCloudModel(provider: ModelProvider): string {
+	if (provider === 'openrouter') return OPENROUTER_DEFAULT_MODEL;
+	if (provider === 'openai') return OPENAI_DEFAULT_MODEL;
+	return GROQ_FALLBACK_MODEL;
+}
+
 export function normalizeProvider(provider?: string): ModelProvider {
-	return provider === 'groq' ? 'groq' : 'ollama';
+	if (provider === 'groq') return 'groq';
+	if (provider === 'openrouter') return 'openrouter';
+	if (provider === 'openai') return 'openai';
+	return 'ollama';
 }
 
 export function modelTagBase(modelId: string): string {

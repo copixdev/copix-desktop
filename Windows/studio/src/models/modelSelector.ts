@@ -7,6 +7,7 @@ import {
 	GROQ_MODEL_FALLBACKS,
 	GROQ_TASK_MODEL_PREFERENCE,
 	MODE_MODEL_PREFERENCE,
+	defaultCloudModel,
 	normalizeProvider,
 	sanitizeGroqModelId,
 	TASK_MODEL_PREFERENCE,
@@ -95,13 +96,20 @@ export function selectModelForTask(
 	const provider = normalizeProvider(settings.provider);
 
 	if (normalized.selection === 'manual') {
-		const manual = normalized.modelId || (provider === 'groq' ? GROQ_FALLBACK_MODEL : FALLBACK_MODEL_ID);
+		const manual = normalized.modelId
+			|| (provider === 'ollama' ? FALLBACK_MODEL_ID : defaultCloudModel(provider));
 		if (provider === 'groq') return sanitizeGroqModelId(manual);
+		if (provider === 'openrouter' || provider === 'openai') return manual;
 		if (modelIsAvailable(manual, installed)) return manual;
 		return modelIsAvailable(FALLBACK_MODEL_ID, installed) ? FALLBACK_MODEL_ID : manual;
 	}
 
 	const taskKind = userMessage ? inferTaskKind(userMessage, agentMode) : null;
+
+	if (provider === 'openrouter' || provider === 'openai') {
+		// One frontier model for all tasks — quality over routing tricks.
+		return normalized.modelId || defaultCloudModel(provider);
+	}
 
 	if (provider === 'groq') {
 		const preferred = taskKind
@@ -124,6 +132,9 @@ export function preferredModelForTask(
 ): string {
 	const provider = normalizeProvider(settings.provider);
 	const taskKind = userMessage ? inferTaskKind(userMessage, agentMode) : null;
+	if (provider === 'openrouter' || provider === 'openai') {
+		return settings.modelId || defaultCloudModel(provider);
+	}
 	if (provider === 'groq') {
 		const preferred = taskKind
 			? GROQ_TASK_MODEL_PREFERENCE[taskKind]
@@ -146,6 +157,9 @@ export function formatModelChipLabel(
 
 	if (provider === 'groq') {
 		return `${prefix}${sanitizeGroqModelId(activeModel)}`;
+	}
+	if (provider === 'openrouter' || provider === 'openai') {
+		return `${prefix}${activeModel}`;
 	}
 
 	const preferred = opts?.preferred;

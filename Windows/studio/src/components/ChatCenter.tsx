@@ -207,7 +207,7 @@ export function ChatCenter({
 
 	const [showScroll, setShowScroll] = useState(false);
 
-	const [server, setServer] = useState<{ online: boolean; models?: string[]; provider?: 'ollama' | 'groq' }>({ online: false });
+	const [server, setServer] = useState<{ online: boolean; models?: string[]; provider?: string }>({ online: false });
 
 	const [starting, setStarting] = useState(false);
 
@@ -421,8 +421,9 @@ export function ChatCenter({
 				msg,
 				{ hasImages: images.length > 0 },
 			);
-			if (runConfig.provider === 'groq' && !runConfig.apiKey) {
-				throw new Error('Groq API key missing — add model.apiKey in ~/Copix/settings.json');
+			if (runConfig.provider !== 'ollama' && !runConfig.apiKey) {
+				const label = runConfig.provider === 'groq' ? 'Groq' : runConfig.provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
+				throw new Error(`${label} API key missing — add model.apiKey in ~/Copix/settings.json`);
 			}
 			const taskKind = inferTaskKind(msg, agentMode);
 
@@ -695,10 +696,14 @@ export function ChatCenter({
 					<span>
 						{modelProvider === 'groq'
 							? 'Groq not ready — add model.apiKey in ~/Copix/settings.json (free key at console.groq.com, no download needed)'
-							: 'Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models (qwen2.5-coder, mistral, qwen3.5)'}
+							: modelProvider === 'openrouter'
+								? 'OpenRouter not ready — add model.apiKey in ~/Copix/settings.json (key at openrouter.ai/keys; unlocks Claude Opus, GPT, Gemini)'
+								: modelProvider === 'openai'
+									? 'OpenAI not ready — add model.apiKey in ~/Copix/settings.json (key at platform.openai.com/api-keys)'
+									: 'Ollama offline or models not ready — open Ollama, then click Check Ollama to download Copix models (qwen2.5-coder, mistral, qwen3.5)'}
 					</span>
 					<button type="button" className="btn primary sm" disabled={starting} onClick={startServer}>
-						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : modelProvider === 'groq' ? 'Check Groq' : 'Check Ollama'}
+						<IconPlay width={12} height={12} /> {starting ? 'Checking…' : modelProvider === 'groq' ? 'Check Groq' : modelProvider === 'openrouter' ? 'Check OpenRouter' : modelProvider === 'openai' ? 'Check OpenAI' : 'Check Ollama'}
 					</button>
 				</div>
 			)}

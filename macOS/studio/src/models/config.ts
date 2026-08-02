@@ -9,7 +9,11 @@ export {
 export type { ModelProvider } from '../types.js';
 
 import type { AgentMode } from './agentModes.js';
-import { FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, GROQ_VISION_MODEL, normalizeProvider, sanitizeGroqModelId } from './modelCatalog.js';
+import {
+	FALLBACK_MODEL_ID, GROQ_BASE_URL, GROQ_MAX_TOKENS, GROQ_VISION_MODEL,
+	OPENAI_BASE_URL, OPENAI_DEFAULT_MODEL, OPENROUTER_BASE_URL, OPENROUTER_DEFAULT_MODEL,
+	normalizeProvider, sanitizeGroqModelId,
+} from './modelCatalog.js';
 import type { ModelProvider } from '../types.js';
 import { selectModelForTask } from './modelSelector.js';
 import type { ModelSettings } from '../types.js';
@@ -53,6 +57,26 @@ export function settingsToConfig(model: ModelSettings, modelId?: string): ModelC
 		};
 	}
 
+	if (provider === 'openrouter') {
+		return {
+			model: modelId ?? (model.modelId || OPENROUTER_DEFAULT_MODEL),
+			baseUrl: OPENROUTER_BASE_URL,
+			provider: 'openrouter',
+			apiKey: sanitizeApiKey(model.apiKey),
+			numPredict: 8192,
+		};
+	}
+
+	if (provider === 'openai') {
+		return {
+			model: modelId ?? (model.modelId || OPENAI_DEFAULT_MODEL),
+			baseUrl: OPENAI_BASE_URL,
+			provider: 'openai',
+			apiKey: sanitizeApiKey(model.apiKey),
+			numPredict: 8192,
+		};
+	}
+
 	const lowVram = Boolean(model.lowVram);
 	return {
 		model: resolved,
@@ -84,7 +108,15 @@ export function resolveChatUrl(config: ModelConfig): string {
 }
 
 export function buildModelHeaders(config: ModelConfig): Record<string, string> {
-	if (config.provider === 'groq') {
+	if (config.provider === 'openrouter') {
+		return {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${config.apiKey ?? ''}`,
+			'HTTP-Referer': 'https://github.com/EJH-BAE/Copix',
+			'X-Title': 'Copix Studio',
+		};
+	}
+	if (config.provider === 'groq' || config.provider === 'openai') {
 		return {
 			'Content-Type': 'application/json',
 			Authorization: `Bearer ${config.apiKey ?? ''}`,
@@ -97,23 +129,30 @@ export function buildModelHeaders(config: ModelConfig): Record<string, string> {
 }
 
 export function providerLabel(config: ModelConfig): string {
-	return config.provider === 'groq' ? 'groq' : 'ollama';
+	return config.provider === 'ollama' ? 'ollama' : config.provider;
 }
 
+const CLOUD_KEY_HINTS: Record<string, string> = {
+	groq: 'free key at console.groq.com',
+	openrouter: 'key at openrouter.ai/keys (unlocks Claude Opus, GPT, Gemini)',
+	openai: 'key at platform.openai.com/api-keys',
+};
+
 export async function checkModelHealth(config: ModelConfig): Promise<{ ok: boolean; message: string }> {
-	if (config.provider === 'groq') {
+	if (config.provider !== 'ollama') {
+		const label = config.provider === 'groq' ? 'Groq' : config.provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
 		if (!config.apiKey) {
-			return { ok: false, message: 'Add model.apiKey in ~/Copix/settings.json (free key at console.groq.com)' };
+			return { ok: false, message: `Add model.apiKey in ~/Copix/settings.json (${CLOUD_KEY_HINTS[config.provider]})` };
 		}
 		try {
 			const res = await fetch(`${config.baseUrl}/models`, {
 				headers: buildModelHeaders(config),
 				signal: AbortSignal.timeout(5000),
 			});
-			if (res.ok) return { ok: true, message: `Groq · ${config.model} ready` };
-			return { ok: false, message: `Groq ${res.status} — check apiKey in settings.json` };
+			if (res.ok) return { ok: true, message: `${label} · ${config.model} ready` };
+			return { ok: false, message: `${label} ${res.status} — check apiKey in settings.json` };
 		} catch {
-			return { ok: false, message: 'Cannot reach Groq — check network and apiKey' };
+			return { ok: false, message: `Cannot reach ${label} — check network and apiKey` };
 		}
 	}
 

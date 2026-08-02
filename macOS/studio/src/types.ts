@@ -42,12 +42,16 @@ export type ThemePreference = 'dark';
 
 export type ModelSelectionMode = 'auto' | 'manual';
 
-export type ModelProvider = 'ollama' | 'groq';
+export type ModelProvider = 'ollama' | 'groq' | 'openrouter' | 'openai';
 
 export interface ModelSettings {
-	/** ollama = local (default). groq = free cloud, no model download. */
+	/**
+	 * ollama = local. groq = free cloud (Llama).
+	 * openrouter = paid cloud with frontier models (Claude Opus, GPT, Gemini) — openrouter.ai/keys.
+	 * openai = direct OpenAI API — platform.openai.com/api-keys.
+	 */
 	provider?: ModelProvider;
-	/** Required when provider is groq — free at console.groq.com */
+	/** Required for groq / openrouter / openai. */
 	apiKey?: string;
 	/** Auto picks a model by agent mode; manual uses modelId. */
 	selection?: ModelSelectionMode;

@@ -6,6 +6,9 @@ import {
 	GROQ_MODEL_FALLBACKS,
 	GROQ_MODE_MODEL_PREFERENCE,
 	MODE_MODEL_PREFERENCE,
+	OPENAI_FEATURED_MODELS,
+	OPENROUTER_FEATURED_MODELS,
+	defaultCloudModel,
 	normalizeProvider,
 	sanitizeGroqModelId,
 } from '../models/modelCatalog';
@@ -56,6 +59,20 @@ function prettyLabel(id: string): string {
 
 export function buildModelOptions(settings: ModelSettings, installed: string[] = []): ModelOption[] {
 	const provider = normalizeProvider(settings.provider);
+	if (provider === 'openrouter' || provider === 'openai') {
+		const featured = provider === 'openrouter' ? OPENROUTER_FEATURED_MODELS : OPENAI_FEATURED_MODELS;
+		const options: ModelOption[] = featured.map(m => ({
+			id: m.id,
+			label: m.label,
+			detail: m.detail,
+			badge: m.id === defaultCloudModel(provider) ? 'BEST' : undefined,
+		}));
+		const custom = settings.modelId?.trim();
+		if (custom && !options.some(o => o.id === custom)) {
+			options.push({ id: custom, label: prettyLabel(custom), detail: 'Custom' });
+		}
+		return options;
+	}
 	if (provider === 'groq') {
 		const ids = uniqueIds([
 			...Object.values(GROQ_MODE_MODEL_PREFERENCE),
@@ -118,10 +135,12 @@ export function ModelPickerMenu({ settings, installed = [], onChange, onClose, c
 	}, [onClose]);
 
 	const setAuto = (next: boolean) => {
+		const provider = normalizeProvider(settings.provider);
 		onChange({
 			...settings,
 			selection: next ? 'auto' : 'manual',
-			modelId: settings.modelId || (normalizeProvider(settings.provider) === 'groq' ? GROQ_FALLBACK_MODEL : FALLBACK_MODEL_ID),
+			modelId: settings.modelId
+				|| (provider === 'ollama' ? FALLBACK_MODEL_ID : defaultCloudModel(provider)),
 		});
 	};
 

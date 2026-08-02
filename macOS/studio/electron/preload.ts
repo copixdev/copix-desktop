@@ -5,7 +5,7 @@ export interface ServerStatus {
 	hasModel?: boolean;
 	models?: string[];
 	missing?: string[];
-	provider?: 'ollama' | 'groq';
+	provider?: 'ollama' | 'groq' | 'openrouter' | 'openai' | string;
 }
 
 const api = {

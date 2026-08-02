@@ -106,7 +106,7 @@ body { transition: background-color 0.2s ease, color 0.2s ease; }
 .shell { display: flex; flex-direction: column; height: 100vh; }
 .shell-body { flex: 1; display: flex; min-height: 0; }
 
-/* Activity rail (Cursor-style icon column) */
+/* Activity rail (IDE icon column) */
 .activity-rail {
 	width: 44px;
 	flex-shrink: 0;
@@ -1059,7 +1059,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	color: #8b8b93;
 }
 
-/* Cursor-style user prompt pill in stream */
+/* IDE user prompt pill in stream */
 .user-prompt-pill {
 	display: flex;
 	flex-direction: column;
@@ -1233,7 +1233,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 }
 .files-changed-more { color: var(--text-3); }
 
-/* Side panel chrome — matches Cursor-style tabbed sidebar */
+/* Side panel chrome — matches IDE tabbed sidebar */
 .side-panel {
 	background: #141416;
 	display: flex;
@@ -1549,7 +1549,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	word-break: break-all;
 }
 
-/* Terminal — Cursor-style sidebar terminal */
+/* Terminal — IDE sidebar terminal */
 .terminal-panel {
 	flex: 1;
 	min-height: 0;
@@ -2924,7 +2924,7 @@ body.platform-darwin .titlebar-mac .titlebar-drag {
 	-webkit-mask-image: linear-gradient(to right, #000 72%, transparent 100%);
 }
 
-/* Sidebar v2 — Cursor Agents layout */
+/* Sidebar v2 — Agents layout */
 .sidebar-v2 { padding: 8px 6px 6px; gap: 4px; }
 .sidebar-cursor { background: #141416; }
 .sidebar-agents .sidebar-top-actions {

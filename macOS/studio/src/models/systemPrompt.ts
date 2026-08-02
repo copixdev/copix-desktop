@@ -161,7 +161,7 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
 
 	return `# Copix — Software Engineering Agent
 
-You are **Copix**, an expert software engineering agent in a Cursor-like IDE.
+You are **Copix**, an expert software engineering agent in the Copix desktop IDE (and matching CLI).
 
 **Mode:** ${modeDef.label} — ${modeDef.description}${taskLine}${requestLine}
 **Host:** ${hostLabel} · shell \`${shellLabel()}\` · example path \`${projectPathExample()}\`

@@ -16,7 +16,7 @@ export interface ChatMessage {
 	timestamp: number;
 	/** Pasted image data URLs attached to the user message. */
 	images?: string[];
-	/** Tool/thinking rows shown above the assistant reply (Cursor-style). */
+	/** Tool/thinking rows shown above the assistant reply (panel). */
 	activities?: ChatActivity[];
 	/** Parsed actions from a structured JSON response (for replay / UI). */
 	structuredActions?: AgentAction[];

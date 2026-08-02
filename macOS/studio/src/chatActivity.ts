@@ -1,4 +1,4 @@
-/** Cursor-style chat activity rows (tool use, thinking, search). */
+/** panel chat activity rows (tool use, thinking, search). */
 
 import type { LineDiffStats } from './utils/lineDiff';
 import { looksLikeSecret } from './utils/secrets';

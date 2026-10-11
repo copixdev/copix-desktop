@@ -1,0 +1,7 @@
+{
+  "repo": "https://github.com/microsoft/vscode.git",
+  "tag": "1.141.0",
+  "license": "MIT",
+  "licenseFile": "LICENSE.txt",
+  "noticesFile": "ThirdPartyNotices.txt"
+}

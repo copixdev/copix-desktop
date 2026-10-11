@@ -1,0 +1,287 @@
+{
+  "name": "copix-agent",
+  "displayName": "Copix Agent",
+  "description": "Copix chat, inline diffs, Ollama, and OpenRouter. The OpenRouter key stays in the OS keychain.",
+  "version": "4.5.0",
+  "publisher": "copix",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:copix.agent.chat",
+    "onCommand:copix.welcome.show"
+  ],
+  "main": "./out/extension",
+  "icon": "media/agent.svg",
+  "scripts": {
+    "compile": "tsc -p tsconfig.test.json",
+    "test": "npm run compile && node --test out/test/*.js"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "copix.agent.newChat",
+        "title": "New Chat",
+        "category": "Copix",
+        "icon": {
+          "light": "media/agent.svg",
+          "dark": "media/agent.svg"
+        }
+      },
+      {
+        "command": "copix.model.pick",
+        "title": "Choose Model",
+        "category": "Copix",
+        "icon": {
+          "light": "media/model.svg",
+          "dark": "media/model.svg"
+        }
+      },
+      {
+        "command": "copix.ollama.check",
+        "title": "Check Ollama",
+        "category": "Copix",
+        "icon": {
+          "light": "media/ollama.svg",
+          "dark": "media/ollama.svg"
+        }
+      },
+      {
+        "command": "copix.edit.accept",
+        "title": "Accept Edit",
+        "category": "Copix",
+        "icon": {
+          "light": "media/diff-accept.svg",
+          "dark": "media/diff-accept.svg"
+        }
+      },
+      {
+        "command": "copix.edit.reject",
+        "title": "Reject Edit",
+        "category": "Copix",
+        "icon": {
+          "light": "media/diff-reject.svg",
+          "dark": "media/diff-reject.svg"
+        }
+      },
+      {
+        "command": "copix.workspace.sync",
+        "title": "Sync Workspace History",
+        "category": "Copix",
+        "icon": {
+          "light": "media/workspace-sync.svg",
+          "dark": "media/workspace-sync.svg"
+        }
+      },
+      {
+        "command": "copix.provider.choose",
+        "title": "Choose Provider",
+        "category": "Copix"
+      },
+      {
+        "command": "copix.openRouter.setKey",
+        "title": "Set OpenRouter Key",
+        "category": "Copix"
+      },
+      {
+        "command": "copix.welcome.show",
+        "title": "Run Setup Again",
+        "category": "Copix"
+      },
+      {
+        "command": "copix.settings.open",
+        "title": "Open Settings",
+        "category": "Copix"
+      },
+      {
+        "command": "copix.activity.open",
+        "title": "Open Copix Activity",
+        "category": "Copix"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "copix.edit.accept",
+          "when": "copix.hasPendingEdit",
+          "group": "navigation@1"
+        },
+        {
+          "command": "copix.edit.reject",
+          "when": "copix.hasPendingEdit",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copix-agent-activity",
+          "title": "Copix Agent",
+          "icon": "media/agent.svg",
+          "order": 4
+        },
+        {
+          "id": "copix-settings",
+          "title": "Settings",
+          "icon": "media/settings.svg",
+          "order": 5
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "copix-agent",
+          "title": "Copix Agent",
+          "icon": "media/agent.svg",
+          "order": 0
+        }
+      ]
+    },
+    "views": {
+      "copix-agent-activity": [
+        {
+          "id": "copix.agent.link",
+          "name": "Copix Agent",
+          "when": "true"
+        }
+      ],
+      "copix-settings": [
+        {
+          "id": "copix.settings",
+          "name": "Settings"
+        }
+      ],
+      "copix-agent": [
+        {
+          "type": "webview",
+          "id": "copix.agent.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "walkthroughs": [
+      {
+        "id": "copix.firstRun",
+        "title": "Welcome to Copix",
+        "description": "A local agent on Ollama, or OpenRouter with the key in the system keychain.",
+        "featuredFor": [
+          "noWorkspace",
+          "empty",
+          "workspace"
+        ],
+        "steps": [
+          {
+            "id": "look",
+            "title": "How should Copix look?",
+            "description": "Pick a theme and a language. You can change both later in Settings.\n[Pick a theme](command:workbench.action.selectTheme)",
+            "media": {
+              "svg": "media/walkthrough-look.svg",
+              "altText": "Theme and language"
+            },
+            "completionEvents": [
+              "onCommand:workbench.action.selectTheme"
+            ]
+          },
+          {
+            "id": "provider",
+            "title": "Where should Copix run?",
+            "description": "Ollama stays on this computer. OpenRouter sends each request to the cloud. The OpenRouter key is stored in the system keychain, not in the settings file.\n[Choose provider](command:copix.provider.choose)",
+            "media": {
+              "svg": "media/walkthrough-provider.svg",
+              "altText": "Ollama or OpenRouter"
+            },
+            "completionEvents": [
+              "onCommand:copix.provider.choose"
+            ]
+          },
+          {
+            "id": "check",
+            "title": "Check this computer",
+            "description": "On an 8 GB machine Copix keeps one model loaded (qwen2.5:3b, about 2 GB) with a short context. Nothing downloads until you pull a model in Ollama. OpenRouter needs no local model.\n[Check Ollama](command:copix.ollama.check)",
+            "media": {
+              "svg": "media/ollama.svg",
+              "altText": "Ollama status"
+            },
+            "completionEvents": [
+              "onCommand:copix.ollama.check"
+            ]
+          },
+          {
+            "id": "tour",
+            "title": "Ask, then review the diff",
+            "description": "Ask in plain words. Copix edits your files as an inline diff. Accept writes the file. Reject discards it. Switch models anytime from the status bar.",
+            "media": {
+              "svg": "media/diff-accept.svg",
+              "altText": "Accept or reject a diff"
+            },
+            "completionEvents": [
+              "onCommand:copix.model.pick"
+            ]
+          },
+          {
+            "id": "try",
+            "title": "Try it",
+            "description": "Start a chat. A good first prompt: make a README for this folder.\n[Start](command:copix.agent.newChat)",
+            "media": {
+              "svg": "media/agent.svg",
+              "altText": "Copix Agent"
+            },
+            "completionEvents": [
+              "onCommand:copix.agent.newChat"
+            ]
+          }
+        ]
+      }
+    ],
+    "configurationDefaults": {
+      "telemetry.telemetryLevel": "off",
+      "telemetry.feedback.enabled": false,
+      "extensions.autoUpdate": "off",
+      "extensions.autoCheckUpdates": false,
+      "workbench.iconTheme": "vs-seti",
+      "workbench.startupEditor": "welcomePage",
+      "workbench.editor.enablePreview": false,
+      "workbench.editor.restoreViewState": true,
+      "files.hotExit": "onExitAndWindowClose",
+      "window.restoreWindows": "all",
+      "editor.minimap.enabled": true,
+      "breadcrumbs.enabled": true,
+      "diffEditor.renderSideBySide": false,
+      "workbench.panel.defaultLocation": "bottom",
+      "workbench.colorCustomizations": {
+        "activityBar.activeBorder": "#c4654a",
+        "focusBorder": "#c4654a",
+        "button.background": "#c4654a",
+        "statusBarItem.remoteBackground": "#c4654a"
+      }
+    },
+    "configuration": {
+      "title": "Copix",
+      "properties": {
+        "copix.provider": {
+          "type": "string",
+          "enum": [
+            "ollama",
+            "openrouter",
+            "groq",
+            "openai"
+          ],
+          "default": "ollama",
+          "description": "Ollama stays on this computer. OpenRouter, Groq, and OpenAI send requests out. The OpenRouter key is kept in the OS keychain."
+        },
+        "copix.model": {
+          "type": "string",
+          "default": "qwen2.5:3b",
+          "description": "Model id. 8 GB machines default to qwen2.5:3b."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/vscode": "^1.95.0",
+    "typescript": "^5.8.2"
+  }
+}

@@ -94,7 +94,7 @@
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "dmg": {
-      "title": "Copix ${version}",
+      "title": "4.4.0",
       "artifactName": "Copix-${version}-macOS-${arch}.${ext}"
     },
     "asar": true

@@ -16,7 +16,6 @@ for (const bin of candidates) {
 	if (result.error?.code === 'ENOENT') continue;
 	lastStatus = result.status ?? 1;
 	if (result.status === 0) process.exit(0);
-	process.exit(lastStatus);
 }
 
 console.error('Python 3 is required to render desktop icons');

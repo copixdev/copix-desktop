@@ -14,7 +14,7 @@
     "onCommand:copix.welcome.show"
   ],
   "main": "./out/extension",
-  "icon": "media/agent.svg",
+  "icon": "media/icon.png",
   "scripts": {
     "compile": "tsc -p tsconfig.test.json",
     "test": "npm run compile && node --test out/test/*.js"

@@ -55,12 +55,46 @@ function sessionStamp(s: ChatSession): number {
 	return s.updatedAt ?? s.messages[s.messages.length - 1]?.timestamp ?? s.createdAt;
 }
 
+function hasOpenEditor(session: ChatSession): boolean {
+	return (session.tabs?.length ?? 0) > 0;
+}
+
+function prefersEditorOf(candidate: ChatSession, current: ChatSession): boolean {
+	const candidateDirty = candidate.tabs?.some(tab => tab.dirty) ?? false;
+	const currentDirty = current.tabs?.some(tab => tab.dirty) ?? false;
+	if (candidateDirty !== currentDirty) return candidateDirty;
+	return false;
+}
+
+/**
+ * Keep the open editor when the other snapshot is a history mirror.
+ * Desktop writes ~/Copix/sessions.json without tab buffers. On window focus
+ * that mirror is merged back; an equal timestamp used to replace the live
+ * session and close the file, dropping unsaved text and the Monaco cursor.
+ */
+function keepEditor(winner: ChatSession, other: ChatSession): ChatSession {
+	if (!hasOpenEditor(winner) && hasOpenEditor(other)) {
+		return { ...winner, tabs: other.tabs, activePath: other.activePath };
+	}
+	if (hasOpenEditor(winner) && hasOpenEditor(other) && prefersEditorOf(other, winner)) {
+		return { ...winner, tabs: other.tabs, activePath: other.activePath };
+	}
+	return winner;
+}
+
 /** Merge two stores by id — the copy with the newest activity wins. */
 export function mergeSessionStores(a: ChatSession[], b: ChatSession[]): ChatSession[] {
 	const byId = new Map<string, ChatSession>();
-	for (const s of [...a, ...b]) {
-		const prev = byId.get(s.id);
-		if (!prev || sessionStamp(s) >= sessionStamp(prev)) byId.set(s.id, s);
+	for (const incoming of [...a, ...b]) {
+		const prev = byId.get(incoming.id);
+		if (!prev) {
+			byId.set(incoming.id, incoming);
+			continue;
+		}
+		const incomingWins = sessionStamp(incoming) >= sessionStamp(prev);
+		const winner = incomingWins ? incoming : prev;
+		const other = incomingWins ? prev : incoming;
+		byId.set(incoming.id, keepEditor(winner, other));
 	}
 	return [...byId.values()].sort((x, y) => sessionStamp(y) - sessionStamp(x));
 }
@@ -86,6 +120,8 @@ export function saveSessions(sessions: ChatSession[]): void {
 	// Debounced mirror to ~/Copix/sessions.json so the CLI sees Desktop history.
 	clearTimeout(diskWriteTimer);
 	diskWriteTimer = setTimeout(() => {
+		// History only. Tab buffers stay in memory and localStorage; merging this
+		// file back on focus must not treat the empty list as "close the file".
 		const slim = sessions.map(s => ({ ...s, tabs: [], origin: s.origin ?? 'desktop' as const }));
 		Promise.resolve(copix.saveChatSessions(JSON.stringify(slim, null, 1))).catch(() => undefined);
 	}, 400);

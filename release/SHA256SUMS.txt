@@ -1,2 +1,2 @@
-57ff52b1eb11d5539c8369ec035d65314efce6996484caf6dbbd88fb9880b78f  Copix-4.3.0-macOS-arm64.dmg
-06e94c837ec7d8f4edd4345f8090dbbd30de7317b2d27061d5646cba5d273094  Copix-4.3.0-Windows-x64.exe
+37c6ef7fdae4cb3cb6a148da80e502ef1b18487c8d98477e9ae444c76fd8d786  Copix-4.4.0-macOS-arm64.dmg
+22eeefad919c8c93b96bacc248f5a8e3ab19b164164a04ea1852afc7ca446c9a  Copix-4.4.0-Windows-x64.exe

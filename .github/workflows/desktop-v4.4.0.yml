@@ -5,10 +5,6 @@ name: Desktop v4.4.0
 
 on:
   workflow_dispatch:
-  # One-shot: the GitHub App token cannot call workflow_dispatch (403).
-  # Removed again after this build so later pushes do not package installers.
-  push:
-    branches: [main]
 
 permissions:
   contents: write

@@ -122,6 +122,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
         run: |
           set -euo pipefail
+          # The setup script requires VSCode-win32-x64/tools (inno_updater.exe).
+          # That copy is a separate gulp task from the win32 package.
+          node --experimental-strip-types --max-old-space-size=6144 ./node_modules/gulp/bin/gulp.js vscode-win32-x64-inno-updater
           node --experimental-strip-types --max-old-space-size=6144 ./node_modules/gulp/bin/gulp.js vscode-win32-x64-user-setup
           mkdir -p ../../dist
           setup="$(find .build/win32-x64 -name '*.exe' -print | head -n 1)"

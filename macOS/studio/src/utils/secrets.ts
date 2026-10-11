@@ -41,5 +41,6 @@ export function redactSecrets(text: string): string {
 	return text
 		.replace(/\bsk-or-v1-[a-f0-9]{20,}\b/gi, 'sk-or-v1-***')
 		.replace(/\bsk-[a-zA-Z0-9_-]{20,}\b/g, 'sk-***')
-		.replace(/\bgsk_[a-zA-Z0-9]{20,}\b/g, 'gsk_***');
+		.replace(/\bgsk_[a-zA-Z0-9]{20,}\b/g, 'gsk_***')
+		.replace(/Bearer\s+[A-Za-z0-9._\-+/=]{8,}/gi, 'Bearer ***');
 }

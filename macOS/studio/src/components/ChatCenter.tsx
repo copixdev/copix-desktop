@@ -423,7 +423,7 @@ export function ChatCenter({
 			);
 			if (runConfig.provider !== 'ollama' && !runConfig.apiKey) {
 				const label = runConfig.provider === 'groq' ? 'Groq' : runConfig.provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
-				throw new Error(`${label} API key missing — add model.apiKey in ~/Copix/settings.json`);
+				throw new Error(`${label} API key missing — add it in Settings. It is stored in the system keychain.`);
 			}
 			const taskKind = inferTaskKind(msg, agentMode);
 

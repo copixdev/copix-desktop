@@ -55,6 +55,11 @@ const api = {
 		ipcRenderer.on('copix:menuAction', handler);
 		return () => { ipcRenderer.removeListener('copix:menuAction', handler); };
 	},
+	getSetupChecks: () => ipcRenderer.invoke('copix:getSetupChecks'),
+	createCopixFolder: () => ipcRenderer.invoke('copix:createCopixFolder') as Promise<{ ok: boolean; path: string }>,
+	getProviderSecret: () => ipcRenderer.invoke('copix:getProviderSecret') as Promise<string>,
+	setProviderSecret: (secret: string) => ipcRenderer.invoke('copix:setProviderSecret', secret) as Promise<{ ok: boolean; message?: string }>,
+	setNativeTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('copix:setNativeTheme', theme) as Promise<void>,
 };
 
 contextBridge.exposeInMainWorld('copix', api);

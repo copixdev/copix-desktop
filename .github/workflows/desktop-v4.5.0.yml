@@ -7,6 +7,8 @@ name: Desktop v4.5.0
 
 on:
   workflow_dispatch:
+  push:
+    branches: [cursor/code-oss-ide-a929]
 
 permissions:
   contents: write

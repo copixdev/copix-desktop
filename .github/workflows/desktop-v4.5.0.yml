@@ -77,6 +77,19 @@ jobs:
           Write-Host "Using $vs"
           [System.IO.File]::AppendAllText($env:GITHUB_ENV, "vs2022_install=$vs`n")
 
+      - name: Put signtool on PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $kits = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $signtool = Get-ChildItem $kits -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\signtool.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe was not found under $kits" }
+          Write-Host "Using $($signtool.FullName)"
+          Add-Content -Path $env:GITHUB_PATH -Value $signtool.DirectoryName
+
       - name: Install and package
         shell: bash
         working-directory: code-oss/src

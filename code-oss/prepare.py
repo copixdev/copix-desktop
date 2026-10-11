@@ -323,6 +323,21 @@ def patch_exe_metadata(src: Path) -> None:
         "'LegalCopyright': 'Copyright (C) 2026 Microsoft. All rights reserved',",
         "'LegalCopyright': 'Copyright (C) Copix. Portions Copyright (C) Microsoft Corporation.',",
     )
+    # patchWin32DependenciesTask asks signtool whether each native binary is
+    # already signed. GitHub-hosted images do not put signtool.exe on PATH, and
+    # a missing tool rejects the spawn. An unsigned draft build can rcedit the
+    # version resources without that check.
+    signed = (
+        "\t\tconst proc = cp.spawn('signtool.exe', ['verify', '/pa', filePath]);\n"
+        "\t\tproc.on('error', reject);"
+    )
+    unsigned = (
+        "\t\tconst proc = cp.spawn('signtool.exe', ['verify', '/pa', filePath]);\n"
+        "\t\tproc.on('error', () => resolve(false));"
+    )
+    if signed not in text and unsigned not in text:
+        raise SystemExit(f"signtool spawn was not found in {path}")
+    text = text.replace(signed, unsigned, 1)
     path.write_text(text)
 
 

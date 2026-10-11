@@ -656,7 +656,7 @@ function installApplicationMenu(): void {
 			submenu: [
 				{
 					label: 'Copix on GitHub',
-					click: () => { void shell.openExternal('https://github.com/EJH-BAE/Copix'); },
+					click: () => { void shell.openExternal('https://github.com/copixdev/copix-desktop'); },
 				},
 			],
 		},

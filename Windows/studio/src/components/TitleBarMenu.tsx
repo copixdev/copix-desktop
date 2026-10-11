@@ -83,7 +83,7 @@ export function TitleBarMenu(props: Props) {
 							)}
 							{m.id === 'help' && (
 								<>
-									{item('Copix on GitHub', () => window.copix?.openExternal('https://github.com/EJH-BAE/Copix'))}
+									{item('Copix on GitHub', () => window.copix?.openExternal('https://github.com/copixdev/copix-desktop'))}
 								</>
 							)}
 						</div>

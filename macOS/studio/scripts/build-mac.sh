@@ -29,5 +29,5 @@ find release release/staging -maxdepth 2 \( -name '*.dmg' -o -name '*.zip' -o -n
 	size=$(du -h "$f" 2>/dev/null | awk '{print $1}')
 	echo "  $f  ($size)"
 done
-echo "Done. Install from studio/release/Copix-*-mac-*.dmg (or open Copix.app)."
+echo "Done. Install from studio/release/Copix-*-macOS-*.dmg (or open Copix.app)."
 echo "Recommended home directory: /Users/{username}"

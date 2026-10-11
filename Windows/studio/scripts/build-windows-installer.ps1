@@ -17,4 +17,4 @@ Write-Host "[3/3] Artifacts:" -ForegroundColor Green
 Get-ChildItem .\release, .\release\staging -Filter *.exe -ErrorAction SilentlyContinue | ForEach-Object {
     Write-Host ("  {0}  ({1:N1} MB)" -f $_.FullName, ($_.Length / 1MB))
 }
-Write-Host "Done. Install with the Copix-Setup-*.exe under studio\release\" -ForegroundColor Cyan
+Write-Host "Done. Install with Copix-*-Windows-x64.exe under studio\release\" -ForegroundColor Cyan

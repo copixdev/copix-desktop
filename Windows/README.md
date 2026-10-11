@@ -12,7 +12,7 @@
 
 <img src="https://img.shields.io/badge/License-Proprietary-lightgrey.svg" alt="License: Proprietary">
 <img src="https://img.shields.io/badge/Price-Free-brightgreen.svg" alt="Free">
-<img src="https://github.com/EJH-BAE/Copix/actions/workflows/dependabot/dependabot-updates/badge.svg" alt="dependabot-updates">
+<img src="https://github.com/copixdev/copix-desktop/actions/workflows/dependabot/dependabot-updates/badge.svg" alt="dependabot-updates">
 </p>
 
 <img width="2559" height="1599" alt="image" src="https://github.com/user-attachments/assets/65814236-00f3-4e22-8d7d-c1fbd4a4c60e" />
@@ -118,7 +118,7 @@ cd studio
 powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
 ```
 
-Output: `studio\release\Copix-Setup-<version>-x64.exe`
+Output: `studio\release\Copix-<version>-Windows-x64.exe`
 
 Portable (no installer): `cd studio && npm run dist:dir` → `release\staging\win-unpacked\Copix.exe`
 
@@ -139,7 +139,7 @@ Windows/
 
 ## Download
 
-Download the latest installer from [Releases](https://github.com/EJH-BAE/Copix/releases).
+Download the latest installer from [Releases](https://github.com/copixdev/copix-desktop/releases).
 Run the downloaded installer (.exe) to install Copix as an app.
 
 ## Run

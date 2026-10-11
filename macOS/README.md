@@ -12,7 +12,7 @@
 
 <img src="https://img.shields.io/badge/License-Proprietary-lightgrey.svg" alt="License: Proprietary">
 <img src="https://img.shields.io/badge/Price-Free-brightgreen.svg" alt="Free">
-<img src="https://github.com/EJH-BAE/Copix/actions/workflows/dependabot/dependabot-updates/badge.svg" alt="dependabot-updates">
+<img src="https://github.com/copixdev/copix-desktop/actions/workflows/dependabot/dependabot-updates/badge.svg" alt="dependabot-updates">
 </p>
 
 <img width="2559" height="1599" alt="image" src="https://github.com/user-attachments/assets/65814236-00f3-4e22-8d7d-c1fbd4a4c60e" />
@@ -147,14 +147,14 @@ Or:
 cd studio && npm install && npm run dist
 ```
 
-Output: `studio/release/Copix-<version>-mac-arm64.dmg` (Apple Silicon) and/or `…-mac-x64.dmg` (Intel)  
+Output: `studio/release/Copix-<version>-macOS-arm64.dmg` (Apple Silicon). `npm run dist:release` builds that DMG. `npm run dist` also builds an Intel DMG and zips.  
 Running: open `Copix.app`, or drag it to Applications
 
 Recommended `workspace.homeDirectory` in settings.json: `/Users/{username}`
 
 ## Download
 
-Download the latest macOS installer from [Releases](https://github.com/EJH-BAE/Copix/releases).
+Download the latest macOS installer from [Releases](https://github.com/copixdev/copix-desktop/releases).
 Open the `.dmg` and drag Copix to Applications.
 
 ## Run

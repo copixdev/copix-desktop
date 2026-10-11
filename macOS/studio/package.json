@@ -1,11 +1,11 @@
 {
   "name": "copix",
-  "version": "4.2.0",
+  "version": "4.4.0",
   "private": true,
   "description": "Copix — official AI IDE for macOS",
   "author": "EJH-BAE",
-  "license": "UNLICENSED",
-  "homepage": "https://github.com/EJH-BAE/Copix",
+  "license": "MIT",
+  "homepage": "https://github.com/copixdev/copix-desktop",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
@@ -19,6 +19,7 @@
     "studio:app": "npm run dist:dir && open release/staging/mac*/Copix.app",
     "icons": "node scripts/generate-icons.mjs",
     "dist": "node scripts/pre-dist.mjs && vite build && electron-builder --mac dmg zip && node scripts/post-dist.mjs",
+    "dist:release": "node scripts/pre-dist.mjs && vite build && electron-builder --mac dmg --arm64 && node scripts/post-dist.mjs",
     "dist:dir": "node scripts/pre-dist.mjs && vite build && electron-builder --mac dir && node scripts/post-dist.mjs",
     "dist:mac": "npm run dist",
     "dist:mac:dir": "npm run dist:dir"
@@ -68,8 +69,9 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "build/icon.png",
-      "artifactName": "Copix-${version}-mac-${arch}.${ext}",
+      "icon": "build/icon.icns",
+      "identity": null,
+      "artifactName": "Copix-${version}-macOS-${arch}.${ext}",
       "target": [
         {
           "target": "dmg",
@@ -93,7 +95,7 @@
     },
     "dmg": {
       "title": "Copix ${version}",
-      "artifactName": "Copix-${version}-mac-${arch}.${ext}"
+      "artifactName": "Copix-${version}-macOS-${arch}.${ext}"
     },
     "asar": true
   }

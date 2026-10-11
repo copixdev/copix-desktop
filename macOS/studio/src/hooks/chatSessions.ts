@@ -55,31 +55,55 @@ function sessionStamp(s: ChatSession): number {
 	return s.updatedAt ?? s.messages[s.messages.length - 1]?.timestamp ?? s.createdAt;
 }
 
-function hasOpenEditor(session: ChatSession): boolean {
-	return (session.tabs?.length ?? 0) > 0;
+/**
+ * Keep unsaved text when two snapshots mention the same path.
+ * A dirty buffer is the edit in the editor. A blank clean snapshot is the
+ * history mirror (~/Copix/sessions.json stores tabs as []), not a user edit.
+ */
+function preferBuffer(winnerTab: EditorTab, otherTab: EditorTab): EditorTab {
+	if (otherTab.dirty !== winnerTab.dirty) return otherTab.dirty ? otherTab : winnerTab;
+	if (!winnerTab.dirty && !otherTab.dirty) {
+		if (winnerTab.content === '' && otherTab.content !== '') return otherTab;
+		if (otherTab.content === '' && winnerTab.content !== '') return winnerTab;
+	}
+	return winnerTab;
 }
 
-function prefersEditorOf(candidate: ChatSession, current: ChatSession): boolean {
-	const candidateDirty = candidate.tabs?.some(tab => tab.dirty) ?? false;
-	const currentDirty = current.tabs?.some(tab => tab.dirty) ?? false;
-	if (candidateDirty !== currentDirty) return candidateDirty;
-	return false;
+function mergeTabs(winnerTabs: EditorTab[], otherTabs: EditorTab[]): EditorTab[] {
+	const byPath = new Map<string, EditorTab>();
+	for (const tab of winnerTabs) byPath.set(tab.path, tab);
+	for (const tab of otherTabs) {
+		const prev = byPath.get(tab.path);
+		byPath.set(tab.path, prev ? preferBuffer(prev, tab) : tab);
+	}
+	const order: string[] = [];
+	for (const tab of [...winnerTabs, ...otherTabs]) {
+		if (!order.includes(tab.path)) order.push(tab.path);
+	}
+	return order.map(path => byPath.get(path)!);
+}
+
+function chooseActivePath(winner: ChatSession, other: ChatSession, tabs: EditorTab[]): string | undefined {
+	const has = (path?: string) => Boolean(path && tabs.some(tab => tab.path === path));
+	const winnerTab = winner.tabs?.find(tab => tab.path === winner.activePath);
+	const otherTab = other.tabs?.find(tab => tab.path === other.activePath);
+	if (otherTab?.dirty && has(other.activePath) && !winnerTab?.dirty) return other.activePath;
+	if (has(winner.activePath)) return winner.activePath;
+	if (has(other.activePath)) return other.activePath;
+	return tabs[0]?.path;
 }
 
 /**
  * Keep the open editor when the other snapshot is a history mirror.
  * Desktop writes ~/Copix/sessions.json without tab buffers. On window focus
  * that mirror is merged back; an equal timestamp used to replace the live
- * session and close the file, dropping unsaved text and the Monaco cursor.
+ * session and close the file. Unsaved buffers are copied per path so a clean
+ * or empty snapshot cannot drop text that is still in the editor.
  */
 function keepEditor(winner: ChatSession, other: ChatSession): ChatSession {
-	if (!hasOpenEditor(winner) && hasOpenEditor(other)) {
-		return { ...winner, tabs: other.tabs, activePath: other.activePath };
-	}
-	if (hasOpenEditor(winner) && hasOpenEditor(other) && prefersEditorOf(other, winner)) {
-		return { ...winner, tabs: other.tabs, activePath: other.activePath };
-	}
-	return winner;
+	const tabs = mergeTabs(winner.tabs ?? [], other.tabs ?? []);
+	if (!tabs.length) return winner;
+	return { ...winner, tabs, activePath: chooseActivePath(winner, other, tabs) };
 }
 
 /** Merge two stores by id — the copy with the newest activity wins. */

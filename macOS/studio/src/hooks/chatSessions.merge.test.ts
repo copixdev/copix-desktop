@@ -92,6 +92,78 @@ test('dirty local buffers win over a clean tab list with a newer stamp', () => {
 	const merged = mergeSessionStores([live], [disk]);
 
 	assert.equal(merged[0]?.activePath, 'a.ts');
-	assert.equal(merged[0]?.tabs[0]?.content, 'local edit');
+	assert.equal(merged[0]?.tabs.find(tab => tab.path === 'a.ts')?.content, 'local edit');
+	assert.equal(merged[0]?.tabs.find(tab => tab.path === 'b.ts')?.content, 'saved on disk');
 	assert.equal(merged[0]?.updatedAt, 40);
+});
+
+test('unsaved text on one file survives a newer clean copy of that same file', () => {
+	const live = session({
+		id: 'agent-1',
+		updatedAt: 10,
+		activePath: 'a.ts',
+		tabs: [
+			{ path: 'a.ts', content: 'unsaved buffer', dirty: true },
+			{ path: 'keep.ts', content: 'also open', dirty: false },
+		],
+	});
+	const disk = session({
+		id: 'agent-1',
+		updatedAt: 40,
+		activePath: 'a.ts',
+		tabs: [
+			{ path: 'a.ts', content: 'saved version', dirty: false },
+			{ path: 'other.ts', content: 'from the newer snapshot', dirty: false },
+		],
+	});
+
+	const merged = mergeSessionStores([live], [disk]);
+	const byPath = Object.fromEntries((merged[0]?.tabs ?? []).map(tab => [tab.path, tab]));
+
+	assert.equal(byPath['a.ts']?.content, 'unsaved buffer');
+	assert.equal(byPath['a.ts']?.dirty, true);
+	assert.equal(byPath['keep.ts']?.content, 'also open');
+	assert.equal(byPath['other.ts']?.content, 'from the newer snapshot');
+	assert.equal(merged[0]?.activePath, 'a.ts');
+	assert.equal(merged[0]?.updatedAt, 40);
+});
+
+test('a blank snapshot does not replace a buffer that was not marked dirty', () => {
+	const live = session({
+		id: 'agent-1',
+		updatedAt: 50,
+		activePath: 'src/main.ts',
+		tabs: [{ path: 'src/main.ts', content: 'typed but not flagged', dirty: false }],
+	});
+	const disk = session({
+		id: 'agent-1',
+		updatedAt: 50,
+		activePath: 'src/main.ts',
+		tabs: [{ path: 'src/main.ts', content: '', dirty: false }],
+	});
+
+	const merged = mergeSessionStores([live], [disk]);
+
+	assert.equal(merged[0]?.tabs[0]?.content, 'typed but not flagged');
+	assert.equal(merged[0]?.activePath, 'src/main.ts');
+});
+
+test('clearing a file is kept when that empty buffer is dirty', () => {
+	const live = session({
+		id: 'agent-1',
+		updatedAt: 10,
+		activePath: 'a.ts',
+		tabs: [{ path: 'a.ts', content: '', dirty: true }],
+	});
+	const disk = session({
+		id: 'agent-1',
+		updatedAt: 40,
+		activePath: 'a.ts',
+		tabs: [{ path: 'a.ts', content: 'saved body', dirty: false }],
+	});
+
+	const merged = mergeSessionStores([live], [disk]);
+
+	assert.equal(merged[0]?.tabs[0]?.content, '');
+	assert.equal(merged[0]?.tabs[0]?.dirty, true);
 });

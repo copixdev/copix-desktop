@@ -16,6 +16,12 @@ export type SidePanelMode = 'hub' | 'changes' | 'terminal' | 'files' | 'browser'
 
 type OpenableMode = Exclude<SidePanelMode, 'hub'>;
 
+type EditorHandle = {
+	getValue(): string;
+	saveViewState(): unknown;
+	restoreViewState(state: unknown): void;
+};
+
 interface Props {
 	tabs: EditorTab[];
 	activePath?: string;
@@ -69,6 +75,45 @@ export function EditorArea({
 	const plusRef = useRef<HTMLDivElement>(null);
 	const active = tabs.find(t => t.path === activePath);
 	const activeLanguage = active ? languageFromPath(active.path) : 'plaintext';
+	const editorRef = useRef<EditorHandle | null>(null);
+	const viewStates = useRef(new Map<string, unknown>());
+	const activePathRef = useRef(active?.path);
+	const contentRef = useRef(active?.content);
+	const onChangeRef = useRef(onChange);
+	activePathRef.current = active?.path;
+	contentRef.current = active?.content;
+	onChangeRef.current = onChange;
+
+	const flushBuffer = () => {
+		const editor = editorRef.current;
+		const path = activePathRef.current;
+		if (!editor || !path) return;
+		try {
+			const view = editor.saveViewState();
+			if (view) viewStates.current.set(path, view);
+			const value = editor.getValue();
+			if (value !== contentRef.current) onChangeRef.current(path, value);
+		} catch {
+			// The model is already disposed. The session copy is the buffer we have.
+		}
+	};
+	const flushRef = useRef(flushBuffer);
+	flushRef.current = flushBuffer;
+
+	useEffect(() => {
+		const onBlur = () => flushRef.current();
+		const onHide = () => {
+			if (document.visibilityState === 'hidden') flushRef.current();
+		};
+		// macOS fires blur when the user switches to another window. Flush the
+		// Monaco model first so the focus merge cannot replace unsaved text.
+		window.addEventListener('blur', onBlur);
+		document.addEventListener('visibilitychange', onHide);
+		return () => {
+			window.removeEventListener('blur', onBlur);
+			document.removeEventListener('visibilitychange', onHide);
+		};
+	}, []);
 
 	useEffect(() => {
 		if (!modeProp) return;
@@ -316,7 +361,20 @@ export function EditorArea({
 											language={activeLanguage}
 											theme={theme === 'light' ? 'vs' : 'vs-dark'}
 											value={active.content}
-											onChange={v => onChange(active.path, v ?? '')}
+											onMount={editor => {
+												const handle = editor as EditorHandle;
+												editorRef.current = handle;
+												const saved = viewStates.current.get(active.path);
+												if (saved) handle.restoreViewState(saved);
+											}}
+											onChange={value => {
+												const editor = editorRef.current;
+												if (editor) {
+													const view = editor.saveViewState();
+													if (view) viewStates.current.set(active.path, view);
+												}
+												onChange(active.path, value ?? '');
+											}}
 											options={{
 												fontSize: 13,
 												fontFamily: "'Cascadia Code', Consolas, 'IBM Plex Mono', monospace",

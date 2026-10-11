@@ -113,6 +113,72 @@ def exclude_extensions(src: Path) -> None:
         shutil.rmtree(copilot)
 
 
+def replace_once(path: Path, old: str, new: str) -> None:
+    text = path.read_text()
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        return
+    if new in text:
+        return
+    raise SystemExit(f"{path.name} is missing the expected anchor:\n{old}")
+
+
+def patch_idle_startup(src: Path) -> None:
+    """Keep the extension host quiet until the user opens a repo or a TypeScript file."""
+    replace_once(
+        src / "extensions/git/package.json",
+        '    "*",\n    "onEditSession:file",',
+        '    "workspaceContains:.git",\n    "onEditSession:file",',
+    )
+    replace_once(
+        src / "extensions/git-base/package.json",
+        '  "activationEvents": [\n    "*"\n  ],',
+        '  "activationEvents": [\n    "workspaceContains:.git"\n  ],',
+    )
+    replace_once(
+        src / "extensions/merge-conflict/package.json",
+        '  "activationEvents": [\n    "onStartupFinished"\n  ],',
+        '  "activationEvents": [\n    "workspaceContains:.git"\n  ],',
+    )
+    replace_once(
+        src / "extensions/debug-auto-launch/package.json",
+        '  "activationEvents": [\n    "onStartupFinished"\n  ],',
+        '  "activationEvents": [\n    "onDebug"\n  ],',
+    )
+    replace_once(
+        src / "extensions/npm/package.json",
+        '    "onTaskType:npm",\n    "onLanguage:json",\n    "workspaceContains:package.json"\n',
+        '    "onTaskType:npm"\n',
+    )
+    replace_once(
+        src / "extensions/emmet/package.json",
+        '    "onCommand:emmet.expandAbbreviation",\n    "onLanguage"\n',
+        '    "onCommand:emmet.expandAbbreviation"\n',
+    )
+    replace_once(
+        src / "extensions/typescript-language-features/package.json",
+        '    "onLanguage:javascript",\n'
+        '    "onLanguage:javascriptreact",\n'
+        '    "onLanguage:typescript",\n'
+        '    "onLanguage:typescriptreact",\n'
+        '    "onLanguage:jsx-tags",\n'
+        '    "onCommand:typescript.tsserverRequest",\n'
+        '    "onCommand:_typescript.configurePlugin",\n'
+        '    "onCommand:_typescript.learnMoreAboutRefactorings",\n'
+        '    "onCommand:typescript.fileReferences",\n'
+        '    "onTaskType:typescript",\n'
+        '    "onLanguage:jsonc",\n'
+        '    "onWalkthrough:nodejsWelcome"\n',
+        '    "onLanguage:typescript",\n'
+        '    "onLanguage:typescriptreact",\n'
+        '    "onCommand:typescript.tsserverRequest",\n'
+        '    "onCommand:_typescript.configurePlugin",\n'
+        '    "onCommand:_typescript.learnMoreAboutRefactorings",\n'
+        '    "onCommand:typescript.fileReferences",\n'
+        '    "onTaskType:typescript"\n',
+    )
+
+
 def patch_activity_order(src: Path) -> None:
     debug = src / "src/vs/workbench/contrib/debug/browser/debug.contribution.ts"
     debug_text = debug.read_text()
@@ -310,6 +376,7 @@ def prepare(src: Path) -> None:
     merge_product(src)
     copy_extension(src)
     exclude_extensions(src)
+    patch_idle_startup(src)
     patch_activity_order(src)
     patch_copilot_shim(src)
     patch_exe_metadata(src)

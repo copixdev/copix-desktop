@@ -195,10 +195,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	await refreshOllama();
 	const timer = setInterval(() => { void refreshOllama(); }, 20_000);
 	context.subscriptions.push({ dispose: () => clearInterval(timer) });
-	if (!context.globalState.get('copix.chatDocked')) {
-		await context.globalState.update('copix.chatDocked', true);
-		void vscode.commands.executeCommand('copix.agent.chat.focus');
-	}
+	// The chat webview stays in the secondary sidebar and is created when that view opens.
 
 	async function refreshOllama(): Promise<void> {
 		const provider = normalizeProvider(state.settings.model.provider);

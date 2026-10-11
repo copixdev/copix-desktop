@@ -62,11 +62,26 @@ jobs:
           git clone --depth 1 --branch 1.141.0 https://github.com/microsoft/vscode.git code-oss/src
           python3 code-oss/prepare.py --src code-oss/src
 
+      - name: Locate Visual Studio
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere was not found" }
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { $vs = & $vswhere -latest -products * -property installationPath }
+          if (-not $vs) { throw "Visual Studio was not found" }
+          Write-Host "Using $vs"
+          "vs2022_install=$vs" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Install and package
         shell: bash
         working-directory: code-oss/src
         env:
           NODE_OPTIONS: --max-old-space-size=6144
+          # @vscode/ripgrep downloads its binary from the GitHub API. Unauthenticated
+          # runners get HTTP 403. The token is masked in the log.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           npm ci

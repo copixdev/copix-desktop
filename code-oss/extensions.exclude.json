@@ -16,5 +16,6 @@
   "vscode-colorize-tests",
   "vscode-colorize-perf-tests",
   "vscode-test-resolver",
-  "extension-editing"
+  "extension-editing",
+  "debug-auto-launch"
 ]

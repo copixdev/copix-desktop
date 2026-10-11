@@ -56,6 +56,8 @@ jobs:
 
       - name: Clone Code-OSS 1.141.0 and apply the Copix shell
         shell: bash
+        env:
+          PYTHONUTF8: "1"
         run: |
           set -euo pipefail
           python -m pip install pillow
@@ -71,8 +73,9 @@ jobs:
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if (-not $vs) { $vs = & $vswhere -latest -products * -property installationPath }
           if (-not $vs) { throw "Visual Studio was not found" }
+          $vs = "$vs".Trim()
           Write-Host "Using $vs"
-          "vs2022_install=$vs" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "vs2022_install=$vs`n")
 
       - name: Install and package
         shell: bash

@@ -11,6 +11,22 @@ import shutil
 import sys
 from pathlib import Path
 
+# Windows CI defaults to cp1252 and rewrites "\n" as CRLF. The vscode tree is UTF-8 with LF.
+_read_text = Path.read_text
+_write_text = Path.write_text
+
+
+def _read_utf8(self: Path, encoding: str | None = None, errors: str | None = None) -> str:
+    return _read_text(self, encoding="utf-8", errors=errors)
+
+
+def _write_utf8(self: Path, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None) -> int:
+    return _write_text(self, data, encoding="utf-8", errors=errors, newline="\n")
+
+
+Path.read_text = _read_utf8  # type: ignore[method-assign]
+Path.write_text = _write_utf8  # type: ignore[method-assign]
+
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 VERSION = "4.5.0"
@@ -60,8 +76,8 @@ def require_anchor(text: str, anchor: str, label: str) -> str:
 
 def merge_product(src: Path) -> None:
     product_path = src / "product.json"
-    product = json.loads(product_path.read_text())
-    overlay = json.loads((ROOT / "product.overlay.json").read_text())
+    product = json.loads(product_path.read_text(encoding="utf-8"))
+    overlay = json.loads((ROOT / "product.overlay.json").read_text(encoding="utf-8"))
     for key in DELETE_PRODUCT_KEYS:
         product.pop(key, None)
     product.update(overlay)
@@ -69,13 +85,13 @@ def merge_product(src: Path) -> None:
     product_path.write_text(json.dumps(product, indent="\t") + "\n")
 
     package_path = src / "package.json"
-    package = json.loads(package_path.read_text())
+    package = json.loads(package_path.read_text(encoding="utf-8"))
     package["version"] = VERSION
     package_path.write_text(json.dumps(package, indent="\t") + "\n")
 
     lock_path = src / "package-lock.json"
     if lock_path.is_file():
-        lock = json.loads(lock_path.read_text())
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
         lock["version"] = VERSION
         packages = lock.get("packages")
         if isinstance(packages, dict) and isinstance(packages.get(""), dict):
@@ -99,9 +115,9 @@ def copy_extension(src: Path) -> None:
 
 
 def exclude_extensions(src: Path) -> None:
-    extra = json.loads((ROOT / "extensions.exclude.json").read_text())
+    extra = json.loads((ROOT / "extensions.exclude.json").read_text(encoding="utf-8"))
     path = src / "build" / "lib" / "extensions.ts"
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     anchor = "const excludedExtensions = ["
     require_anchor(text, anchor, path.name)
     insertion = "".join(f"\t'{name}',\n" for name in extra)
@@ -114,13 +130,32 @@ def exclude_extensions(src: Path) -> None:
 
 
 def replace_once(path: Path, old: str, new: str) -> None:
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     if old in text:
         path.write_text(text.replace(old, new, 1))
         return
     if new in text:
         return
     raise SystemExit(f"{path.name} is missing the expected anchor:\n{old}")
+
+
+def patch_npm_dirs(src: Path) -> None:
+    """postinstall.ts spawns npm in every listed directory. A removed folder makes that spawn fail."""
+    path = src / "build" / "npm" / "dirs.ts"
+    text = path.read_text()
+    marker = "Copix skips extension directories that were removed"
+    if marker in text:
+        return
+    path.write_text(text.rstrip() + """
+
+// Copix skips extension directories that were removed before npm ci.
+for (let i = dirs.length - 1; i >= 0; i--) {
+	const dir = dirs[i];
+	if (dir && !existsSync(`${import.meta.dirname}/../../${dir}`)) {
+		dirs.splice(i, 1);
+	}
+}
+""")
 
 
 def patch_idle_startup(src: Path) -> None:
@@ -181,7 +216,7 @@ def patch_idle_startup(src: Path) -> None:
 
 def patch_activity_order(src: Path) -> None:
     debug = src / "src/vs/workbench/contrib/debug/browser/debug.contribution.ts"
-    debug_text = debug.read_text()
+    debug_text = debug.read_text(encoding="utf-8")
     debug_anchor = "\ticon: icons.runViewIcon,\n\talwaysUseContainerInfo: true,\n\torder: 3,"
     require_anchor(debug_text, debug_anchor, debug.name)
     debug.write_text(debug_text.replace(
@@ -191,7 +226,7 @@ def patch_activity_order(src: Path) -> None:
     ))
 
     extensions = src / "src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts"
-    ext_text = extensions.read_text()
+    ext_text = extensions.read_text(encoding="utf-8")
     ext_anchor = "\t\ticon: extensionsViewIcon,\n\t\torder: 4,"
     require_anchor(ext_text, ext_anchor, extensions.name)
     extensions.write_text(ext_text.replace(
@@ -203,7 +238,7 @@ def patch_activity_order(src: Path) -> None:
 
 def patch_copilot_shim(src: Path) -> None:
     path = src / "build" / "gulpfile.vscode.ts"
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     anchor = "\t\tconst builtInCopilotExtensionDir = path.join(appBase, 'extensions', 'copilot');\n"
     require_anchor(text, anchor, path.name)
     guard = (
@@ -220,13 +255,13 @@ def patch_missing_chat_agent(src: Path) -> None:
     A few startup paths still dereference it. Guard those so the shell boots.
     """
     onboarding = src / "src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts"
-    text = onboarding.read_text()
+    text = onboarding.read_text(encoding="utf-8")
     anchor = "assertDefined(product.defaultChatAgent, 'Onboarding requires a default chat agent product configuration.');\n"
     require_anchor(text, anchor, onboarding.name)
     onboarding.write_text(text.replace(anchor, "", 1))
 
     accounts = src / "src/vs/workbench/services/accounts/browser/defaultAccount.ts"
-    text = accounts.read_text()
+    text = accounts.read_text(encoding="utf-8")
     ctor = "\t\tthis.defaultAccountConfig = toDefaultAccountConfig(productService.defaultChatAgent);\n"
     require_anchor(text, ctor, accounts.name)
     empty = (
@@ -250,7 +285,7 @@ def patch_missing_chat_agent(src: Path) -> None:
     accounts.write_text(text)
 
     gallery = src / "src/vs/platform/extensionManagement/common/extensionGalleryService.ts"
-    text = gallery.read_text()
+    text = gallery.read_text(encoding="utf-8")
     mark = "\t\tdeprecated[this.productService.defaultChatAgent.extensionId.toLowerCase()] = {"
     require_anchor(text, mark, gallery.name)
     gallery.write_text(text.replace(
@@ -260,7 +295,7 @@ def patch_missing_chat_agent(src: Path) -> None:
     ))
 
     uninstall = src / "src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts"
-    text = uninstall.read_text()
+    text = uninstall.read_text(encoding="utf-8")
     gate = "\t\tif (areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId })) {"
     require_anchor(text, gate, uninstall.name)
     uninstall.write_text(text.replace(
@@ -270,7 +305,7 @@ def patch_missing_chat_agent(src: Path) -> None:
     ))
 
     workbench = src / "src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts"
-    text = workbench.read_text()
+    text = workbench.read_text(encoding="utf-8")
     gate = "\t\tif (!areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId })) {"
     require_anchor(text, gate, workbench.name)
     workbench.write_text(text.replace(
@@ -282,7 +317,7 @@ def patch_missing_chat_agent(src: Path) -> None:
 
 def patch_exe_metadata(src: Path) -> None:
     path = src / "build" / "gulpfile.vscode.ts"
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     text = text.replace("'CompanyName': 'Microsoft Corporation',", "'CompanyName': 'Copix',")
     text = text.replace(
         "'LegalCopyright': 'Copyright (C) 2026 Microsoft. All rights reserved',",
@@ -318,18 +353,18 @@ def install_icons(src: Path) -> None:
     write_ico(tile, resources / "win32" / "code.ico")
     write_icns(tile, resources / "darwin" / "code.icns")
 
-    mark = (ROOT / "resources" / "code-icon.svg").read_text()
+    mark = (ROOT / "resources" / "code-icon.svg").read_text(encoding="utf-8")
     (src / "src/vs/workbench/browser/media/code-icon.svg").write_text(mark)
-    letter = (ROOT / "resources" / "letterpress.svg").read_text()
+    letter = (ROOT / "resources" / "letterpress.svg").read_text(encoding="utf-8")
     media = src / "src/vs/workbench/browser/parts/editor/media"
     for name in ("letterpress-dark.svg", "letterpress-light.svg", "letterpress-hcDark.svg", "letterpress-hcLight.svg"):
         (media / name).write_text(letter)
 
 
 def append_notices(src: Path) -> None:
-    credit = (ROOT / "NOTICE.md").read_text().strip() + "\n"
+    credit = (ROOT / "NOTICE.md").read_text(encoding="utf-8").strip() + "\n"
     notices = src / "ThirdPartyNotices.txt"
-    existing = notices.read_text() if notices.is_file() else ""
+    existing = notices.read_text(encoding="utf-8") if notices.is_file() else ""
     if "Codicons" not in existing.split("--- Copix ---")[-1]:
         notices.write_text(existing.rstrip() + "\n\n--- Copix ---\n\n" + credit)
     (src / "NOTICE.txt").write_text(credit)
@@ -376,6 +411,7 @@ def prepare(src: Path) -> None:
     merge_product(src)
     copy_extension(src)
     exclude_extensions(src)
+    patch_npm_dirs(src)
     patch_idle_startup(src)
     patch_activity_order(src)
     patch_copilot_shim(src)
@@ -384,7 +420,7 @@ def prepare(src: Path) -> None:
     install_icons(src)
     append_notices(src)
     rebrand_tree(src)
-    product = json.loads((src / "product.json").read_text())
+    product = json.loads((src / "product.json").read_text(encoding="utf-8"))
     if product.get("nameShort") != "Copix":
         raise SystemExit("product.json was not branded")
     if product.get("extensionsGallery", {}).get("serviceUrl", "").find("open-vsx.org") < 0:

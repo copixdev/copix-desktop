@@ -16,14 +16,16 @@
 
 ## Download
 
-**Copix Desktop v4.3.0.** Install [Ollama](https://ollama.com) first. The default model is `qwen2.5:3b`.
+**Copix Desktop v4.4.0.** Install [Ollama](https://ollama.com) first. The default model is `qwen2.5:3b`.
 
 | Platform | Installer |
 | --- | --- |
-| macOS (Apple Silicon) | [`Copix-4.3.0-macOS-arm64.dmg`](https://github.com/copixdev/copix-desktop/releases/download/v4.3.0/Copix-4.3.0-macOS-arm64.dmg) |
-| Windows (x64) | [`Copix-4.3.0-Windows-x64.exe`](https://github.com/copixdev/copix-desktop/releases/download/v4.3.0/Copix-4.3.0-Windows-x64.exe) |
+| macOS (Apple Silicon) | [`Copix-4.4.0-macOS-arm64.dmg`](https://github.com/copixdev/copix-desktop/releases/download/v4.4.0/Copix-4.4.0-macOS-arm64.dmg) |
+| Windows (x64) | [`Copix-4.4.0-Windows-x64.exe`](https://github.com/copixdev/copix-desktop/releases/download/v4.4.0/Copix-4.4.0-Windows-x64.exe) |
+| macOS (Apple Silicon), 4.3.0 | [`Copix-4.3.0-macOS-arm64.dmg`](https://github.com/copixdev/copix-desktop/releases/download/v4.3.0/Copix-4.3.0-macOS-arm64.dmg) |
+| Windows (x64), 4.3.0 | [`Copix-4.3.0-Windows-x64.exe`](https://github.com/copixdev/copix-desktop/releases/download/v4.3.0/Copix-4.3.0-Windows-x64.exe) |
 
-Checksums: [`release/SHA256SUMS.txt`](release/SHA256SUMS.txt). Release page: [v4.3.0](https://github.com/copixdev/copix-desktop/releases/tag/v4.3.0).
+Checksums: [`release/SHA256SUMS.txt`](release/SHA256SUMS.txt). Release page: [v4.4.0](https://github.com/copixdev/copix-desktop/releases/tag/v4.4.0).
 
 ## Desktop
 

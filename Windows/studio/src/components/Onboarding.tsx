@@ -144,8 +144,8 @@ export function Onboarding(props: OnboardingProps) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [checks.ramGb, checks.cpuCount, provider, recommended.id, model.modelId, model.singleModel, model.numCtx, model.numGpu, model.keepAlive, model.numThread]);
 
-	const canLeaveProvider = provider === 'ollama' || hasStoredKey || draftKey.trim().length > 0;
-	const canLeaveCheck = provider !== 'ollama' || (checks.ollamaOnline && checks.hasModel);
+		const canLeaveProvider = provider === 'ollama' || hasStoredKey || draftKey.trim().length > 0;
+		const ollamaOffline = provider === 'ollama' && !checks.ollamaOnline;
 
 	const saveDraftKey = async (): Promise<boolean> => {
 		if (provider !== 'openrouter') return true;
@@ -241,8 +241,8 @@ export function Onboarding(props: OnboardingProps) {
 			size: sizeLabel(language, recommended),
 		});
 
-	const primaryLabel = step === 'try' ? t(language, 'start') : t(language, 'continue');
-	const primaryDisabled = savingKey || (step === 'provider' && !canLeaveProvider) || (step === 'check' && !canLeaveCheck);
+		const primaryLabel = step === 'try' ? t(language, 'start') : t(language, 'continue');
+		const primaryDisabled = savingKey || (step === 'provider' && !canLeaveProvider);
 
 	return (
 		<div className="ob-root" role="dialog" aria-modal="true" aria-labelledby="ob-title">
@@ -401,7 +401,7 @@ export function Onboarding(props: OnboardingProps) {
 						)}
 						{pulling && <p className="ob-note">{t(language, 'pulling', { model: selected.id })}{pullPct != null ? ` ${pullPct}%` : ''}</p>}
 						{pullError && <p className="ob-note warn">{pullError}</p>}
-						{provider === 'ollama' && !canLeaveCheck && <p className="ob-note">{t(language, 'continueNeeds')}</p>}
+							{ollamaOffline && <p className="ob-note">{t(language, 'continueNeeds')}</p>}
 					</>
 				)}
 

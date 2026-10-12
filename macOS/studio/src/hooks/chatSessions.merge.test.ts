@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { mergeSessionStores, type ChatSession } from './chatSessions';
 
 function session(partial: Partial<ChatSession> & Pick<ChatSession, 'id'>): ChatSession {
@@ -75,26 +75,41 @@ test('closing the last tab stays closed across an equal-stamp merge', () => {
 	assert.equal(merged[0]?.activePath, undefined);
 });
 
-test('dirty local buffers win over a clean tab list with a newer stamp', () => {
-	const live = session({
+test('a closed tab does not come back when the newer copy has a shorter list', () => {
+	const older = session({
 		id: 'agent-1',
 		updatedAt: 10,
-		activePath: 'a.ts',
-		tabs: [{ path: 'a.ts', content: 'local edit', dirty: true }],
+		activePath: 'b.ts',
+		tabs: [
+			{
+				path: 'a.ts',
+				content: 'unsaved a',
+				dirty: true,
+				cursor: { lineNumber: 4, column: 2, scrollTop: 80 },
+			},
+			{
+				path: 'b.ts',
+				content: 'closed file',
+				dirty: true,
+				cursor: { lineNumber: 9, column: 1 },
+			},
+		],
 	});
-	const disk = session({
+	const newer = session({
 		id: 'agent-1',
 		updatedAt: 40,
-		activePath: 'b.ts',
-		tabs: [{ path: 'b.ts', content: 'saved on disk', dirty: false }],
+		activePath: 'a.ts',
+		tabs: [{ path: 'a.ts', content: 'saved a', dirty: false }],
 	});
 
-	const merged = mergeSessionStores([live], [disk]);
-
-	assert.equal(merged[0]?.activePath, 'a.ts');
-	assert.equal(merged[0]?.tabs.find(tab => tab.path === 'a.ts')?.content, 'local edit');
-	assert.equal(merged[0]?.tabs.find(tab => tab.path === 'b.ts')?.content, 'saved on disk');
-	assert.equal(merged[0]?.updatedAt, 40);
+	for (const merged of [mergeSessionStores([older], [newer]), mergeSessionStores([newer], [older])]) {
+		assert.deepEqual(merged[0]?.tabs.map(tab => tab.path), ['a.ts']);
+		assert.equal(merged[0]?.tabs[0]?.content, 'unsaved a');
+		assert.equal(merged[0]?.tabs[0]?.dirty, true);
+		assert.deepEqual(merged[0]?.tabs[0]?.cursor, { lineNumber: 4, column: 2, scrollTop: 80 });
+		assert.equal(merged[0]?.activePath, 'a.ts');
+		assert.equal(merged[0]?.updatedAt, 40);
+	}
 });
 
 test('unsaved text on one file survives a newer clean copy of that same file', () => {
@@ -122,8 +137,9 @@ test('unsaved text on one file survives a newer clean copy of that same file', (
 
 	assert.equal(byPath['a.ts']?.content, 'unsaved buffer');
 	assert.equal(byPath['a.ts']?.dirty, true);
-	assert.equal(byPath['keep.ts']?.content, 'also open');
+	assert.equal(byPath['keep.ts'], undefined);
 	assert.equal(byPath['other.ts']?.content, 'from the newer snapshot');
+	assert.deepEqual(merged[0]?.tabs.map(tab => tab.path), ['a.ts', 'other.ts']);
 	assert.equal(merged[0]?.activePath, 'a.ts');
 	assert.equal(merged[0]?.updatedAt, 40);
 });

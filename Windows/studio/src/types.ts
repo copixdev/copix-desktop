@@ -22,10 +22,19 @@ export interface ChatMessage {
 	structuredActions?: AgentAction[];
 }
 
+/** Cursor and scroll for one open file. A focus merge copies this onto tabs that stay open. */
+export interface EditorCursor {
+	lineNumber: number;
+	column: number;
+	scrollTop?: number;
+	scrollLeft?: number;
+}
+
 export interface EditorTab {
 	path: string;
 	content: string;
 	dirty: boolean;
+	cursor?: EditorCursor;
 }
 
 export interface LayoutSettings {

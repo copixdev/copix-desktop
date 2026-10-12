@@ -56,54 +56,42 @@ function sessionStamp(s: ChatSession): number {
 }
 
 /**
- * Keep unsaved text when two snapshots mention the same path.
- * A dirty buffer is the edit in the editor. A blank clean snapshot is the
- * history mirror (~/Copix/sessions.json stores tabs as []), not a user edit.
+ * Copy unsaved text and cursor onto a tab that is still open.
+ * The older snapshot must not add a path the newer snapshot already closed.
  */
-function preferBuffer(winnerTab: EditorTab, otherTab: EditorTab): EditorTab {
-	if (otherTab.dirty !== winnerTab.dirty) return otherTab.dirty ? otherTab : winnerTab;
-	if (!winnerTab.dirty && !otherTab.dirty) {
-		if (winnerTab.content === '' && otherTab.content !== '') return otherTab;
-		if (otherTab.content === '' && winnerTab.content !== '') return winnerTab;
+function carryUnsaved(newerTab: EditorTab, olderTab: EditorTab | undefined): EditorTab {
+	if (!olderTab) return newerTab;
+	let next = newerTab;
+	const olderDirty = olderTab.dirty && !newerTab.dirty;
+	const blankMirror = !newerTab.dirty && !olderTab.dirty && newerTab.content === '' && olderTab.content !== '';
+	if (olderDirty || blankMirror) {
+		next = { ...next, content: olderTab.content, dirty: olderTab.dirty || next.dirty };
 	}
-	return winnerTab;
+	const cursor = (olderDirty ? olderTab.cursor : undefined) ?? next.cursor ?? olderTab.cursor;
+	if (cursor && cursor !== next.cursor) next = { ...next, cursor };
+	return next;
 }
 
-function mergeTabs(winnerTabs: EditorTab[], otherTabs: EditorTab[]): EditorTab[] {
-	const byPath = new Map<string, EditorTab>();
-	for (const tab of winnerTabs) byPath.set(tab.path, tab);
-	for (const tab of otherTabs) {
-		const prev = byPath.get(tab.path);
-		byPath.set(tab.path, prev ? preferBuffer(prev, tab) : tab);
-	}
-	const order: string[] = [];
-	for (const tab of [...winnerTabs, ...otherTabs]) {
-		if (!order.includes(tab.path)) order.push(tab.path);
-	}
-	return order.map(path => byPath.get(path)!);
-}
-
-function chooseActivePath(winner: ChatSession, other: ChatSession, tabs: EditorTab[]): string | undefined {
-	const has = (path?: string) => Boolean(path && tabs.some(tab => tab.path === path));
-	const winnerTab = winner.tabs?.find(tab => tab.path === winner.activePath);
-	const otherTab = other.tabs?.find(tab => tab.path === other.activePath);
-	if (otherTab?.dirty && has(other.activePath) && !winnerTab?.dirty) return other.activePath;
-	if (has(winner.activePath)) return winner.activePath;
-	if (has(other.activePath)) return other.activePath;
+function activeIn(tabs: EditorTab[], path?: string): string | undefined {
+	if (path && tabs.some(tab => tab.path === path)) return path;
 	return tabs[0]?.path;
 }
 
 /**
- * Keep the open editor when the other snapshot is a history mirror.
- * Desktop writes ~/Copix/sessions.json without tab buffers. On window focus
- * that mirror is merged back; an equal timestamp used to replace the live
- * session and close the file. Unsaved buffers are copied per path so a clean
- * or empty snapshot cannot drop text that is still in the editor.
+ * The newer snapshot decides which files are open. A closed tab in that list
+ * stays closed. Unsaved text and cursor move across only for paths that remain.
+ * An empty tab list is the history mirror (~/Copix/sessions.json strips tabs),
+ * not a close, when the other copy still has the editor open.
  */
 function keepEditor(winner: ChatSession, other: ChatSession): ChatSession {
-	const tabs = mergeTabs(winner.tabs ?? [], other.tabs ?? []);
-	if (!tabs.length) return winner;
-	return { ...winner, tabs, activePath: chooseActivePath(winner, other, tabs) };
+	const winnerTabs = winner.tabs ?? [];
+	const otherTabs = other.tabs ?? [];
+	if (winnerTabs.length === 0 && otherTabs.length > 0) {
+		return { ...winner, tabs: otherTabs, activePath: activeIn(otherTabs, other.activePath ?? winner.activePath) };
+	}
+	const olderByPath = new Map(otherTabs.map(tab => [tab.path, tab]));
+	const tabs = winnerTabs.map(tab => carryUnsaved(tab, olderByPath.get(tab.path)));
+	return { ...winner, tabs, activePath: activeIn(tabs, winner.activePath) };
 }
 
 /** Merge two stores by id — the copy with the newest activity wins. */
@@ -115,7 +103,7 @@ export function mergeSessionStores(a: ChatSession[], b: ChatSession[]): ChatSess
 			byId.set(incoming.id, incoming);
 			continue;
 		}
-		const incomingWins = sessionStamp(incoming) >= sessionStamp(prev);
+		const incomingWins = sessionStamp(incoming) > sessionStamp(prev);
 		const winner = incomingWins ? incoming : prev;
 		const other = incomingWins ? prev : incoming;
 		byId.set(incoming.id, keepEditor(winner, other));

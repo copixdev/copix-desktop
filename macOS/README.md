@@ -1,5 +1,5 @@
 <p align="center">
-<img width="150" height="150" alt="copix_icon" src="https://github.com/user-attachments/assets/657fd098-2baa-476a-b116-289aa2f97276" />
+<img width="150" height="150" alt="copix_icon" src="https://raw.githubusercontent.com/copixdev/copix-desktop/main/icon.png" />
 </p>
 
 <h1 align="center">Copix</h1>
@@ -12,10 +12,9 @@
 
 <img src="https://img.shields.io/badge/License-Proprietary-lightgrey.svg" alt="License: Proprietary">
 <img src="https://img.shields.io/badge/Price-Free-brightgreen.svg" alt="Free">
-<img src="https://github.com/copixdev/copix-desktop/actions/workflows/dependabot/dependabot-updates/badge.svg" alt="dependabot-updates">
 </p>
 
-<img width="2559" height="1599" alt="image" src="https://github.com/user-attachments/assets/65814236-00f3-4e22-8d7d-c1fbd4a4c60e" />
+<img width="820" alt="Copix Desktop" src="https://raw.githubusercontent.com/copixdev/copix-desktop/main/assets/desktop.png" />
 
 ---
 

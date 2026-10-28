@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { EditorTab } from '../types';
+import { EditorCursor, EditorTab } from '../types';
 import { FileTree } from './FileTree';
 import { TerminalPanel } from './TerminalPanel';
 import { ChangesPanel } from './ChangesPanel';
@@ -16,6 +16,19 @@ export type SidePanelMode = 'hub' | 'changes' | 'terminal' | 'files' | 'browser'
 
 type OpenableMode = Exclude<SidePanelMode, 'hub'>;
 
+type EditorHandle = {
+	getValue(): string;
+	getPosition(): { lineNumber: number; column: number } | null;
+	getScrollTop(): number;
+	getScrollLeft(): number;
+	setPosition(position: { lineNumber: number; column: number }): void;
+	setScrollTop(scrollTop: number): void;
+	setScrollLeft(scrollLeft: number): void;
+	saveViewState(): unknown;
+	restoreViewState(state: unknown): void;
+	focus(): void;
+};
+
 interface Props {
 	tabs: EditorTab[];
 	activePath?: string;
@@ -27,7 +40,8 @@ interface Props {
 	onModeChange?: (mode: SidePanelMode) => void;
 	onSelect: (path: string) => void;
 	onClose: (path: string) => void;
-	onChange: (path: string, content: string) => void;
+	onChange: (path: string, content: string, cursor?: EditorCursor) => void;
+	onCursor?: (path: string, cursor: EditorCursor) => void;
 	onOpenFile: (path: string) => void;
 	onNewAgent?: () => void;
 	onOpenFolder?: () => void;
@@ -57,7 +71,7 @@ function shortPath(p?: string): string {
 export function EditorArea({
 	tabs, activePath, workspace, tree, theme = 'dark',
 	fileChanges = [], mode: modeProp, onModeChange,
-	onSelect, onClose, onChange, onOpenFile,
+	onSelect, onClose, onChange, onCursor, onOpenFile,
 	onOpenFolder, onFocusComposer, onTogglePanel, onExpandPanel,
 }: Props) {
 	const [mode, setMode] = useState<SidePanelMode>(modeProp ?? (tabs.length ? 'files' : 'hub'));
@@ -69,6 +83,60 @@ export function EditorArea({
 	const plusRef = useRef<HTMLDivElement>(null);
 	const active = tabs.find(t => t.path === activePath);
 	const activeLanguage = active ? languageFromPath(active.path) : 'plaintext';
+	const editorRef = useRef<EditorHandle | null>(null);
+	const viewStates = useRef(new Map<string, unknown>());
+	const activePathRef = useRef(active?.path);
+	const contentRef = useRef(active?.content);
+	const onChangeRef = useRef(onChange);
+	const onCursorRef = useRef(onCursor);
+	activePathRef.current = active?.path;
+	contentRef.current = active?.content;
+	onChangeRef.current = onChange;
+	onCursorRef.current = onCursor;
+
+	const readCursor = (editor: EditorHandle): EditorCursor | undefined => {
+		const position = editor.getPosition();
+		if (!position) return undefined;
+		return {
+			lineNumber: position.lineNumber,
+			column: position.column,
+			scrollTop: editor.getScrollTop(),
+			scrollLeft: editor.getScrollLeft(),
+		};
+	};
+
+	const flushBuffer = () => {
+		const editor = editorRef.current;
+		const path = activePathRef.current;
+		if (!editor || !path) return;
+		try {
+			const view = editor.saveViewState();
+			if (view) viewStates.current.set(path, view);
+			const cursor = readCursor(editor);
+			const value = editor.getValue();
+			if (value !== contentRef.current) onChangeRef.current(path, value, cursor);
+			else if (cursor) onCursorRef.current?.(path, cursor);
+		} catch {
+			// The model is already disposed. The session copy is the buffer we have.
+		}
+	};
+	const flushRef = useRef(flushBuffer);
+	flushRef.current = flushBuffer;
+
+	useEffect(() => {
+		const onBlur = () => flushRef.current();
+		const onHide = () => {
+			if (document.visibilityState === 'hidden') flushRef.current();
+		};
+		// macOS fires blur when the user switches to another window. Flush the
+		// Monaco model first so the focus merge cannot replace unsaved text.
+		window.addEventListener('blur', onBlur);
+		document.addEventListener('visibilitychange', onHide);
+		return () => {
+			window.removeEventListener('blur', onBlur);
+			document.removeEventListener('visibilitychange', onHide);
+		};
+	}, []);
 
 	useEffect(() => {
 		if (!modeProp) return;
@@ -316,7 +384,28 @@ export function EditorArea({
 											language={activeLanguage}
 											theme={theme === 'light' ? 'vs' : 'vs-dark'}
 											value={active.content}
-											onChange={v => onChange(active.path, v ?? '')}
+											onMount={editor => {
+												const handle = editor as EditorHandle;
+												editorRef.current = handle;
+												const saved = viewStates.current.get(active.path);
+												if (saved) {
+													handle.restoreViewState(saved);
+												} else if (active.cursor) {
+													handle.setPosition({ lineNumber: active.cursor.lineNumber, column: active.cursor.column });
+													if (active.cursor.scrollTop != null) handle.setScrollTop(active.cursor.scrollTop);
+													if (active.cursor.scrollLeft != null) handle.setScrollLeft(active.cursor.scrollLeft);
+												}
+											}}
+											onChange={value => {
+												const editor = editorRef.current;
+												let cursor: EditorCursor | undefined;
+												if (editor) {
+													const view = editor.saveViewState();
+													if (view) viewStates.current.set(active.path, view);
+													cursor = readCursor(editor);
+												}
+												onChange(active.path, value ?? '', cursor);
+											}}
 											options={{
 												fontSize: 13,
 												fontFamily: "'Cascadia Code', Consolas, 'IBM Plex Mono', monospace",

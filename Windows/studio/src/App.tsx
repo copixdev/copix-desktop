@@ -447,9 +447,14 @@ function AppInner() {
 					activePath: activeSession?.activePath === path ? next[next.length - 1]?.path : activeSession?.activePath,
 				});
 			}}
-			onChange={(path, content) => {
+			onChange={(path, content, cursor) => {
 				patchSession(activeSessionId, {
-					tabs: (activeSession?.tabs ?? []).map(t => t.path === path ? { ...t, content, dirty: true } : t),
+					tabs: (activeSession?.tabs ?? []).map(t => t.path === path ? { ...t, content, dirty: true, ...(cursor ? { cursor } : {}) } : t),
+				});
+			}}
+			onCursor={(path, cursor) => {
+				patchSession(activeSessionId, {
+					tabs: (activeSession?.tabs ?? []).map(t => t.path === path ? { ...t, cursor } : t),
 				});
 			}}
 			onOpenFile={path => {

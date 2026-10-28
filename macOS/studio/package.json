@@ -15,6 +15,7 @@
     "prestart": "npm run build",
     "start": "node scripts/check-build.mjs && electron .",
     "studio": "vite",
+    "test": "vitest run",
     "studio:test": "npm run build && node scripts/check-build.mjs && electron .",
     "studio:app": "npm run dist:dir && open release/staging/mac*/Copix.app",
     "icons": "node scripts/generate-icons.mjs",
@@ -44,7 +45,8 @@
     "typescript": "^5.8.2",
     "vite": "^6.2.1",
     "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6"
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^3.2.7"
   },
   "build": {
     "appId": "com.copix.app",

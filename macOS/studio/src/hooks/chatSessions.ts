@@ -55,12 +55,58 @@ function sessionStamp(s: ChatSession): number {
 	return s.updatedAt ?? s.messages[s.messages.length - 1]?.timestamp ?? s.createdAt;
 }
 
+/**
+ * Copy unsaved text and cursor onto a tab that is still open.
+ * The older snapshot must not add a path the newer snapshot already closed.
+ */
+function carryUnsaved(newerTab: EditorTab, olderTab: EditorTab | undefined): EditorTab {
+	if (!olderTab) return newerTab;
+	let next = newerTab;
+	const olderDirty = olderTab.dirty && !newerTab.dirty;
+	const blankMirror = !newerTab.dirty && !olderTab.dirty && newerTab.content === '' && olderTab.content !== '';
+	if (olderDirty || blankMirror) {
+		next = { ...next, content: olderTab.content, dirty: olderTab.dirty || next.dirty };
+	}
+	const cursor = (olderDirty ? olderTab.cursor : undefined) ?? next.cursor ?? olderTab.cursor;
+	if (cursor && cursor !== next.cursor) next = { ...next, cursor };
+	return next;
+}
+
+function activeIn(tabs: EditorTab[], path?: string): string | undefined {
+	if (path && tabs.some(tab => tab.path === path)) return path;
+	return tabs[0]?.path;
+}
+
+/**
+ * The newer snapshot decides which files are open. A closed tab in that list
+ * stays closed. Unsaved text and cursor move across only for paths that remain.
+ * An empty tab list is the history mirror (~/Copix/sessions.json strips tabs),
+ * not a close, when the other copy still has the editor open.
+ */
+function keepEditor(winner: ChatSession, other: ChatSession): ChatSession {
+	const winnerTabs = winner.tabs ?? [];
+	const otherTabs = other.tabs ?? [];
+	if (winnerTabs.length === 0 && otherTabs.length > 0) {
+		return { ...winner, tabs: otherTabs, activePath: activeIn(otherTabs, other.activePath ?? winner.activePath) };
+	}
+	const olderByPath = new Map(otherTabs.map(tab => [tab.path, tab]));
+	const tabs = winnerTabs.map(tab => carryUnsaved(tab, olderByPath.get(tab.path)));
+	return { ...winner, tabs, activePath: activeIn(tabs, winner.activePath) };
+}
+
 /** Merge two stores by id — the copy with the newest activity wins. */
 export function mergeSessionStores(a: ChatSession[], b: ChatSession[]): ChatSession[] {
 	const byId = new Map<string, ChatSession>();
-	for (const s of [...a, ...b]) {
-		const prev = byId.get(s.id);
-		if (!prev || sessionStamp(s) >= sessionStamp(prev)) byId.set(s.id, s);
+	for (const incoming of [...a, ...b]) {
+		const prev = byId.get(incoming.id);
+		if (!prev) {
+			byId.set(incoming.id, incoming);
+			continue;
+		}
+		const incomingWins = sessionStamp(incoming) > sessionStamp(prev);
+		const winner = incomingWins ? incoming : prev;
+		const other = incomingWins ? prev : incoming;
+		byId.set(incoming.id, keepEditor(winner, other));
 	}
 	return [...byId.values()].sort((x, y) => sessionStamp(y) - sessionStamp(x));
 }
@@ -86,6 +132,8 @@ export function saveSessions(sessions: ChatSession[]): void {
 	// Debounced mirror to ~/Copix/sessions.json so the CLI sees Desktop history.
 	clearTimeout(diskWriteTimer);
 	diskWriteTimer = setTimeout(() => {
+		// History only. Tab buffers stay in memory and localStorage; merging this
+		// file back on focus must not treat the empty list as "close the file".
 		const slim = sessions.map(s => ({ ...s, tabs: [], origin: s.origin ?? 'desktop' as const }));
 		Promise.resolve(copix.saveChatSessions(JSON.stringify(slim, null, 1))).catch(() => undefined);
 	}, 400);

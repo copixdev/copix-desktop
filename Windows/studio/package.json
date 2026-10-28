@@ -15,6 +15,7 @@
     "prestart": "npm run build",
     "start": "node scripts/check-build.mjs && electron .",
     "studio": "vite",
+    "test": "vitest run",
     "studio:test": "npm run build && node scripts/check-build.mjs && electron .",
     "studio:app": "npm run dist:dir && start release\\\\staging\\\\win-unpacked\\\\Copix.exe",
     "icons": "node scripts/generate-icons.mjs",
@@ -42,6 +43,7 @@
     "vite": "^6.2.1",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^3.2.7",
     "rcedit": "^4.0.1",
     "resedit": "^3.0.2"
   },

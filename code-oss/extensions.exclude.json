@@ -1,0 +1,21 @@
+[
+  "copilot",
+  "github",
+  "github-authentication",
+  "microsoft-authentication",
+  "ipynb",
+  "notebook-renderers",
+  "tunnel-forwarding",
+  "simple-browser",
+  "mermaid-markdown-features",
+  "markdown-math",
+  "grunt",
+  "gulp",
+  "jake",
+  "vscode-api-tests",
+  "vscode-colorize-tests",
+  "vscode-colorize-perf-tests",
+  "vscode-test-resolver",
+  "extension-editing",
+  "debug-auto-launch"
+]

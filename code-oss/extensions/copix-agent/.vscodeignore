@@ -1,0 +1,9 @@
+src/**
+**/*.map
+tsconfig*.json
+esbuild.mts
+node_modules/**
+out/**
+**/*.ts
+!dist/**
+!media/**

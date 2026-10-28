@@ -1,0 +1,7 @@
+code-oss/src/
+__pycache__/
+*.pyc
+code-oss/extensions/copix-agent/node_modules/
+code-oss/extensions/copix-agent/out/
+code-oss/extensions/copix-agent/dist/
+.DS_Store

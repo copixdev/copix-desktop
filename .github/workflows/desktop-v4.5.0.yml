@@ -1,0 +1,174 @@
+# Builds Copix Desktop 4.5.0 from microsoft/vscode (MIT) and attaches the
+# installers to a DRAFT GitHub Release titled "v4.5.0". It does not publish
+# the release. workflow_dispatch is the normal entry. A one-shot push trigger
+# is added only long enough to queue the build when dispatch returns 403, then
+# removed so later pushes do not package installers.
+name: Desktop v4.5.0
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Agent unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: code-oss/extensions/copix-agent/package-lock.json
+      - name: Test the Copix agent core
+        working-directory: code-oss/extensions/copix-agent
+        run: |
+          npm ci
+          npm test
+
+  package:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS arm64 dmg
+            gulp: vscode-darwin-arm64
+            artifact_name: macos-dmg
+          - os: windows-latest
+            label: Windows x64 exe
+            gulp: vscode-win32-x64
+            artifact_name: windows-exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Clone Code-OSS 1.141.0 and apply the Copix shell
+        shell: bash
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          set -euo pipefail
+          python -m pip install pillow
+          git clone --depth 1 --branch 1.141.0 https://github.com/microsoft/vscode.git code-oss/src
+          python3 code-oss/prepare.py --src code-oss/src
+
+      - name: Locate Visual Studio
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere was not found" }
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { $vs = & $vswhere -latest -products * -property installationPath }
+          if (-not $vs) { throw "Visual Studio was not found" }
+          $vs = "$vs".Trim()
+          Write-Host "Using $vs"
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "vs2022_install=$vs`n")
+
+      - name: Put signtool on PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $kits = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $signtool = Get-ChildItem $kits -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\signtool.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe was not found under $kits" }
+          Write-Host "Using $($signtool.FullName)"
+          Add-Content -Path $env:GITHUB_PATH -Value $signtool.DirectoryName
+
+      - name: Install and package
+        shell: bash
+        working-directory: code-oss/src
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+          # @vscode/ripgrep downloads its binary from the GitHub API. Unauthenticated
+          # runners get HTTP 403. The token is masked in the log.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm ci
+          node --experimental-strip-types --max-old-space-size=6144 ./node_modules/gulp/bin/gulp.js ${{ matrix.gulp }}
+
+      - name: macOS disk image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="code-oss/VSCode-darwin-arm64/Copix.app"
+          test -d "$app"
+          mkdir -p dist
+          hdiutil create -volname "Copix 4.5.0" -srcfolder "$app" -ov -format UDZO "dist/Copix-4.5.0-macOS-arm64.dmg"
+          hdiutil info || true
+
+      - name: Windows installer
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: code-oss/src
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          set -euo pipefail
+          # The setup script requires VSCode-win32-x64/tools (inno_updater.exe).
+          # That copy is a separate gulp task from the win32 package.
+          node --experimental-strip-types --max-old-space-size=6144 ./node_modules/gulp/bin/gulp.js vscode-win32-x64-inno-updater
+          node --experimental-strip-types --max-old-space-size=6144 ./node_modules/gulp/bin/gulp.js vscode-win32-x64-user-setup
+          mkdir -p ../../dist
+          setup="$(find .build/win32-x64 -name '*.exe' -print | head -n 1)"
+          test -n "$setup"
+          cp "$setup" ../../dist/Copix-4.5.0-Windows-x64.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/Copix-4.5.0-*
+          if-no-files-found: error
+
+  release:
+    name: Attach v4.5.0 draft release
+    needs: [test, package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Checksums and draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          find dist -type f \( -name '*.dmg' -o -name '*.exe' \) -exec cp {} publish/ \;
+          (
+            cd publish
+            sha256sum Copix-4.5.0-macOS-arm64.dmg Copix-4.5.0-Windows-x64.exe > SHA256SUMS.txt
+          )
+          cat publish/SHA256SUMS.txt
+          notes=.github/desktop-v4.5.0-release-notes.md
+          if gh release view v4.5.0 --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload v4.5.0 publish/* --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release edit v4.5.0 --repo "${GITHUB_REPOSITORY}" --draft --title "v4.5.0" --notes-file "$notes"
+          else
+            gh release create v4.5.0 publish/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --title "v4.5.0" \
+              --notes-file "$notes" \
+              --target "${GITHUB_SHA}"
+          fi

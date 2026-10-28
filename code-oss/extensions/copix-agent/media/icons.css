@@ -1,0 +1,4 @@
+/* Copix icons follow the Codicon grid: 16px, 1px stroke, currentColor.
+   Active state uses the clay accent. */
+.copix-icon { width: 16px; height: 16px; color: currentColor; }
+.copix-icon.active { color: #c4654a; }

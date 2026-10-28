@@ -35,7 +35,21 @@ Checksums: [`release/SHA256SUMS.txt`](release/SHA256SUMS.txt). Release page: [v4
 
 <p align="center"><a href="assets/demo.mov"><strong>Watch the demo</strong></a></p>
 
-## Build from source
+## Desktop 4.5.0
+
+4.5.0 rebuilds the desktop shell on [Code - OSS](https://github.com/microsoft/vscode) (`microsoft/vscode` 1.141.0, MIT). The Copix agent is a built-in extension: chat on the right, inline diffs with Accept and Reject, Ollama and OpenRouter, and the OpenRouter key in the OS keychain. The gallery is Open VSX. Telemetry is off. `LICENSE.txt` and `ThirdPartyNotices.txt` from Code-OSS stay in the app. Codicons are credited in `code-oss/NOTICE.md`.
+
+The macOS disk image volume name is `Copix 4.5.0`. Installers are attached to a draft GitHub Release by `.github/workflows/desktop-v4.5.0.yml` when that workflow is run by hand. This branch does not publish the release.
+
+```bash
+git clone --depth 1 --branch 1.141.0 https://github.com/microsoft/vscode.git code-oss/src
+python3 -m pip install pillow
+python3 code-oss/prepare.py --src code-oss/src
+```
+
+Then, from `code-oss/src`, with Node 24.18.0: `npm ci` and the `vscode-darwin-arm64` or `vscode-win32-x64` gulp task.
+
+## Build from source (4.4 studio)
 
 Requires [Node.js 18+](https://nodejs.org). Both apps package with electron-builder.
 

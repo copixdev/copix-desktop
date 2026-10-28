@@ -1,0 +1,278 @@
+@import "./fonts.css";
+
+/* Copix Desktop theme tokens. Values match the designer's tokens.css.
+   --ui / --mono alias the font stacks. Korean in mono falls through to Pretendard. */
+
+:root {
+	--font-ui: "Pretendard Variable", Pretendard, "SUIT Variable", Inter, system-ui, sans-serif;
+	--ui: var(--font-ui);
+	--font-mono: "Geist Mono", "JetBrains Mono", "Pretendard Variable", Pretendard, ui-monospace, monospace;
+	--mono: var(--font-mono);
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 32px;
+	--fs-xs: 10.5px;
+	--fs-sm: 12px;
+	--fs-md: 13.5px;
+	--fs-lg: 15px;
+	--fs-xl: 22px;
+	--lh-tight: 1.25;
+	--lh-body: 1.55;
+	--dur-fast: 120ms;
+	--dur-med: 240ms;
+	--dur-slow: 420ms;
+	--dur-sweep: 1600ms;
+	--ease-out: cubic-bezier(.2, .8, .2, 1);
+	--ease-in-out: cubic-bezier(.65, 0, .35, 1);
+	--ease-spring: cubic-bezier(.34, 1.4, .64, 1);
+	--rail-w: 240px;
+	--right-w: 220px;
+	--top-h: 48px;
+	--anim-caret: caret-blink 1s steps(1, end) infinite;
+	--anim-blink: blink 1s steps(1, end) infinite;
+}
+
+[data-concept="paper"] {
+	--radius: 12px;
+	--gap: 12px;
+	--font-display: "Fraunces", "Noto Serif KR", serif;
+	--font-body: "Newsreader", "Fraunces", "Pretendard Variable", serif;
+}
+
+[data-concept="glass"] {
+	--radius: 16px;
+	--gap: 14px;
+	--font-display: var(--font-ui);
+	--font-body: var(--font-ui);
+}
+
+[data-concept="terminal"] {
+	--radius: 8px;
+	--gap: 8px;
+	--font-display: var(--font-mono);
+	--font-body: var(--font-mono);
+}
+
+[data-concept="paper"][data-theme="light"] {
+	color-scheme: light;
+	--bg: #f6eadc;
+	--pan: #f9f0e5;
+	--sub: #f3e6d6;
+	--text: #1c1612;
+	--muted: #6b5a4c;
+	--line: #d9c7b1;
+	--hov: #ecdcc8;
+	--accent: #a8503a;
+	--on-accent: #ffffff;
+	--accent2: #5d6e52;
+	--add: #4f6145;
+	--dl: #a8503a;
+	--addbg: #e3e8da;
+	--addfg: #3f5036;
+	--delbg: #f1d9cf;
+	--delfg: #8a3a26;
+	--inv: #1c1612;
+	--on-inv: #f6eadc;
+}
+
+[data-concept="paper"][data-theme="dark"] {
+	color-scheme: dark;
+	--bg: #1c1612;
+	--pan: #231c17;
+	--sub: #2a221c;
+	--text: #efe1cf;
+	--muted: #ad9c8a;
+	--line: #3d3229;
+	--hov: #2e251e;
+	--accent: #e08166;
+	--on-accent: #1c1612;
+	--accent2: #9fb38f;
+	--add: #a9bb98;
+	--dl: #e59a82;
+	--addbg: #26301f;
+	--addfg: #b4c6a3;
+	--delbg: #3a221a;
+	--delfg: #efa58d;
+	--inv: #efe1cf;
+	--on-inv: #1c1612;
+}
+
+[data-concept="glass"][data-theme="frost"] {
+	color-scheme: light;
+	--bg: #eceff5;
+	--pan: rgba(255, 255, 255, .55);
+	--sub: rgba(255, 255, 255, .62);
+	--text: #16171b;
+	--muted: #5b5f6b;
+	--line: rgba(20, 24, 40, .10);
+	--hov: rgba(255, 255, 255, .8);
+	--accent: #b0553c;
+	--on-accent: #ffffff;
+	--accent2: #5f7a54;
+	--add: #4d6843;
+	--dl: #a44a32;
+	--addbg: rgba(111, 138, 99, .16);
+	--addfg: #3d5634;
+	--delbg: rgba(208, 105, 78, .16);
+	--delfg: #94402a;
+	--inv: #16171b;
+	--on-inv: #ffffff;
+}
+
+[data-concept="glass"][data-theme="smoke"] {
+	color-scheme: dark;
+	--bg: #0d0d10;
+	--pan: rgba(30, 31, 36, .6);
+	--sub: rgba(255, 255, 255, .05);
+	--text: #ecedf0;
+	--muted: #a2a5ae;
+	--line: rgba(255, 255, 255, .10);
+	--hov: rgba(255, 255, 255, .10);
+	--accent: #e8876c;
+	--on-accent: #111111;
+	--accent2: #a8c39a;
+	--add: #a8c39a;
+	--dl: #f0a58f;
+	--addbg: rgba(111, 138, 99, .22);
+	--addfg: #b8d2aa;
+	--delbg: rgba(208, 105, 78, .22);
+	--delfg: #f4b19d;
+	--inv: #ecedf0;
+	--on-inv: #111111;
+}
+
+[data-concept="terminal"][data-theme="ink"] {
+	color-scheme: dark;
+	--bg: #0d0b0a;
+	--pan: #14110f;
+	--sub: #1a1613;
+	--text: #e6dccf;
+	--muted: #9a8e80;
+	--line: #2e2823;
+	--hov: #1f1a16;
+	--accent: #d9765a;
+	--on-accent: #0d0b0a;
+	--accent2: #8fae7f;
+	--add: #9fbb8c;
+	--dl: #e08a70;
+	--addbg: #18220f;
+	--addfg: #a8c494;
+	--delbg: #2a1510;
+	--delfg: #e8957b;
+	--inv: #e6dccf;
+	--on-inv: #0d0b0a;
+}
+
+[data-concept="terminal"][data-theme="bone"] {
+	color-scheme: light;
+	--bg: #ebe5d8;
+	--pan: #f3efe6;
+	--sub: #ede7db;
+	--text: #1c1612;
+	--muted: #665a4d;
+	--line: #d8d0c2;
+	--hov: #e6dfd1;
+	--accent: #a4472f;
+	--on-accent: #ffffff;
+	--accent2: #566c4a;
+	--add: #46603a;
+	--dl: #a2442c;
+	--addbg: #e2ead8;
+	--addfg: #3b5230;
+	--delbg: #f3dcd2;
+	--delfg: #8f3a25;
+	--inv: #1c1612;
+	--on-inv: #f3efe6;
+}
+
+[data-accent="indigo-teal"][data-mode="light"] {
+	--accent: #4f46e5;
+	--on-accent: #ffffff;
+	--accent2: #0f766e;
+}
+
+[data-accent="indigo-teal"][data-mode="dark"] {
+	--accent: #a5b4fc;
+	--on-accent: #111111;
+	--accent2: #2dd4bf;
+}
+
+[data-accent="plum-amber"][data-mode="light"] {
+	--accent: #86366a;
+	--on-accent: #ffffff;
+	--accent2: #8a5a00;
+}
+
+[data-accent="plum-amber"][data-mode="dark"] {
+	--accent: #e2a3cf;
+	--on-accent: #111111;
+	--accent2: #f0b44c;
+}
+
+@keyframes caret-blink {
+	0%, 45% { opacity: 1; }
+	50%, 100% { opacity: 0; }
+}
+
+@keyframes blink {
+	0%, 45% { opacity: 1; }
+	50%, 100% { opacity: 0; }
+}
+
+.u-caret { animation: var(--anim-caret); }
+.u-blink { animation: var(--anim-blink); }
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--dur-fast: 0ms;
+		--dur-med: 0ms;
+		--dur-slow: 0ms;
+		--dur-sweep: 0ms;
+		--anim-caret: none;
+		--anim-blink: none;
+	}
+
+	.u-caret,
+	.u-blink {
+		animation: none;
+	}
+}
+
+[data-reduce="1"] {
+	--dur-fast: 0ms;
+	--dur-med: 0ms;
+	--dur-slow: 0ms;
+	--dur-sweep: 0ms;
+	--anim-caret: none;
+	--anim-blink: none;
+}
+
+[data-reduce="1"] .u-caret,
+[data-reduce="1"] .u-blink {
+	animation: none;
+}
+
+/* Solid stand-in for glass translucency when backdrop-filter is unavailable.
+   Each value is the translucent token composited over --bg (panels) or over --pan (chips and lines). */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+	[data-concept="glass"][data-theme="frost"] {
+		--pan: rgb(246, 248, 250);
+		--sub: rgb(248, 249, 251);
+		--line: rgb(224, 225, 229);
+		--hov: rgb(253, 254, 254);
+		--addbg: rgb(225, 230, 226);
+		--delbg: rgb(240, 225, 223);
+	}
+
+	[data-concept="glass"][data-theme="smoke"] {
+		--pan: rgb(23, 24, 28);
+		--sub: rgb(25, 25, 28);
+		--line: rgb(46, 47, 51);
+		--hov: rgb(46, 47, 51);
+		--addbg: rgb(43, 49, 44);
+		--delbg: rgb(64, 42, 39);
+	}
+}

@@ -4,4 +4,5 @@ __pycache__/
 code-oss/extensions/copix-agent/node_modules/
 code-oss/extensions/copix-agent/out/
 code-oss/extensions/copix-agent/dist/
+shared/theme/node_modules/
 .DS_Store

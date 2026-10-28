@@ -22,6 +22,11 @@ export const DEFAULT_NUM_CTX = 16384;
 export const LOW_VRAM_NUM_CTX = 8192;
 export const DEFAULT_NUM_PREDICT = 16384;
 export const LOW_VRAM_NUM_PREDICT = 8192;
+/** 8 GB machines: one quantized model, a short context, and no second resident model. */
+export const RAM8_NUM_CTX = 4096;
+export const RAM8_NUM_PREDICT = 2048;
+export const RAM8_KEEP_ALIVE = '5m';
+export const RAM8_NUM_BATCH = 128;
 
 /** Strip whitespace and reject placeholder keys from defaults / docs. */
 export function sanitizeApiKey(apiKey?: string): string | undefined {
@@ -40,6 +45,10 @@ export interface ModelConfig {
 	numCtx?: number;
 	numPredict?: number;
 	numGpu?: number;
+	numThread?: number;
+	keepAlive?: string;
+	numBatch?: number;
+	singleModel?: boolean;
 }
 
 export function settingsToConfig(model: ModelSettings, modelId?: string): ModelConfig {
@@ -79,13 +88,20 @@ export function settingsToConfig(model: ModelSettings, modelId?: string): ModelC
 	}
 
 	const lowVram = Boolean(model.lowVram);
+	const singleModel = Boolean(model.singleModel);
+	const tight = singleModel && lowVram;
+	const numCtx = model.numCtx ?? (tight ? RAM8_NUM_CTX : lowVram ? LOW_VRAM_NUM_CTX : DEFAULT_NUM_CTX);
 	return {
 		model: resolved,
 		baseUrl: OLLAMA_BASE_URL,
 		provider: 'ollama',
-		numCtx: lowVram ? LOW_VRAM_NUM_CTX : DEFAULT_NUM_CTX,
-		numPredict: lowVram ? LOW_VRAM_NUM_PREDICT : DEFAULT_NUM_PREDICT,
-		numGpu: undefined,
+		numCtx,
+		numPredict: model.numPredict ?? (tight ? RAM8_NUM_PREDICT : lowVram ? LOW_VRAM_NUM_PREDICT : DEFAULT_NUM_PREDICT),
+		numGpu: model.numGpu,
+		numThread: model.numThread,
+		keepAlive: model.keepAlive ?? (tight ? RAM8_KEEP_ALIVE : '30m'),
+		numBatch: numCtx <= RAM8_NUM_CTX ? RAM8_NUM_BATCH : 512,
+		singleModel,
 	};
 }
 
@@ -133,17 +149,11 @@ export function providerLabel(config: ModelConfig): string {
 	return config.provider === 'ollama' ? 'ollama' : config.provider;
 }
 
-const CLOUD_KEY_HINTS: Record<string, string> = {
-	groq: 'free key at console.groq.com',
-	openrouter: 'key at openrouter.ai/keys (unlocks Claude Opus, GPT, Gemini)',
-	openai: 'key at platform.openai.com/api-keys',
-};
-
 export async function checkModelHealth(config: ModelConfig): Promise<{ ok: boolean; message: string }> {
 	if (config.provider !== 'ollama') {
 		const label = config.provider === 'groq' ? 'Groq' : config.provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
 		if (!config.apiKey) {
-			return { ok: false, message: `Add model.apiKey in ~/Copix/settings.json (${CLOUD_KEY_HINTS[config.provider]})` };
+			return { ok: false, message: `Add your ${label} key in Settings. It is stored in the system keychain.` };
 		}
 		try {
 			const res = await fetch(`${config.baseUrl}/models`, {
@@ -151,9 +161,9 @@ export async function checkModelHealth(config: ModelConfig): Promise<{ ok: boole
 				signal: AbortSignal.timeout(5000),
 			});
 			if (res.ok) return { ok: true, message: `${label} · ${config.model} ready` };
-			return { ok: false, message: `${label} ${res.status} — check apiKey in settings.json` };
+			return { ok: false, message: `${label} ${res.status} — check the key in Settings` };
 		} catch {
-			return { ok: false, message: `Cannot reach ${label} — check network and apiKey` };
+			return { ok: false, message: `Cannot reach ${label} — check the network and the key in Settings` };
 		}
 	}
 

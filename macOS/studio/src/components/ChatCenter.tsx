@@ -208,6 +208,7 @@ export function ChatCenter({
 	const [showScroll, setShowScroll] = useState(false);
 
 	const [server, setServer] = useState<{ online: boolean; models?: string[]; provider?: string }>({ online: false });
+	const [serverKnown, setServerKnown] = useState(false);
 
 	const [starting, setStarting] = useState(false);
 
@@ -280,10 +281,26 @@ export function ChatCenter({
 	}, []);
 
 	useEffect(() => {
-		const poll = () => copix.getServerStatus().then(setServer);
+		let stop = false;
+		const poll = () => {
+			try {
+				Promise.resolve(copix.getServerStatus()).then(status => {
+					if (stop) return;
+					setServer(status);
+					setServerKnown(true);
+				}).catch(() => {
+					if (!stop) setServerKnown(true);
+				});
+			} catch {
+				if (!stop) setServerKnown(true);
+			}
+		};
 		poll();
 		const t = setInterval(poll, 3000);
-		return () => clearInterval(t);
+		return () => {
+			stop = true;
+			clearInterval(t);
+		};
 	}, []);
 
 	useEffect(() => {
@@ -423,7 +440,7 @@ export function ChatCenter({
 			);
 			if (runConfig.provider !== 'ollama' && !runConfig.apiKey) {
 				const label = runConfig.provider === 'groq' ? 'Groq' : runConfig.provider === 'openrouter' ? 'OpenRouter' : 'OpenAI';
-				throw new Error(`${label} API key missing — add model.apiKey in ~/Copix/settings.json`);
+				throw new Error(`${label} API key missing — add it in Settings. It is stored in the system keychain.`);
 			}
 			const taskKind = inferTaskKind(msg, agentMode);
 
@@ -597,11 +614,20 @@ export function ChatCenter({
 
 
 	useEffect(() => {
-		if (!pendingPrompt?.trim() || pendingPromptSentRef.current || running || !workspace || !modelReady) return;
+		if (!pendingPrompt?.trim() || pendingPromptSentRef.current || running || !workspace || !serverKnown) return;
+		if (!modelReady) {
+			if (modelProvider !== 'ollama') return;
+			pendingPromptSentRef.current = true;
+			onPendingPromptConsumed?.();
+			setInput(pendingPrompt);
+			setCaret(pendingPrompt.length);
+			toast('Ollama is not running. The prompt is ready to send once Ollama is open.', 'err');
+			return;
+		}
 		pendingPromptSentRef.current = true;
 		onPendingPromptConsumed?.();
 		void send(pendingPrompt);
-	}, [pendingPrompt, running, workspace, modelReady, onPendingPromptConsumed]);
+	}, [pendingPrompt, running, workspace, modelReady, serverKnown, modelProvider, onPendingPromptConsumed]);
 
 
 

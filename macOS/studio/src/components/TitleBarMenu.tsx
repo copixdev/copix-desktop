@@ -6,6 +6,7 @@ export interface TitleBarMenuActions {
 	onCloneRepo?: () => void;
 	onToggleEditor?: () => void;
 	onOpenPalette?: () => void;
+	onOpenSettings?: () => void;
 }
 
 interface Props extends TitleBarMenuActions {}
@@ -62,6 +63,7 @@ export function TitleBarMenu(props: Props) {
 									{item('New Agent', props.onNewAgent)}
 									{item('Open Folder…', props.onOpenFolder)}
 									{item('Clone Repository…', props.onCloneRepo)}
+									{item('Settings…', props.onOpenSettings)}
 									<div className="titlebar-menu-sep" />
 									{item('Exit', () => window.close())}
 								</>

@@ -13,7 +13,7 @@ import { inferTaskKind, isContinuationMessage, isReadOnlyTask, isSimpleChatMessa
 import { actionToTool, parseStructuredResponse, type StructuredAgentResponse } from './structuredResponse.js';
 import { webFetch, webSearch } from './webBrowse.js';
 import { computeLineDiff, truncateText } from '../utils/lineDiff.js';
-import { assertSafeFilePath } from '../utils/secrets.js';
+import { assertSafeFilePath, redactSecrets } from '../utils/secrets.js';
 import { emitAgentTerminal } from '../utils/terminalBridge.js';
 import { isMac, isWindows, projectPathExample, shellLabel } from '../utils/platform.js';
 
@@ -825,7 +825,7 @@ async function streamCompletion(
 			GROQ_FALLBACK_MODEL,
 		])]
 		: config.provider === 'ollama'
-			? [...new Set([config.model, FALLBACK_MODEL_ID])]
+			? (config.singleModel ? [config.model] : [...new Set([config.model, FALLBACK_MODEL_ID])])
 			: [config.model];
 
 	let maxTokens = config.provider === 'groq'
@@ -862,11 +862,14 @@ async function streamCompletion(
 				...(tools ? { tools } : {}),
 				stream: true,
 				temperature: 0.05,
+				keep_alive: config.keepAlive ?? '30m',
 				options: {
-					...(config.numCtx != null ? { num_ctx: config.numCtx } : { num_ctx: 16384 }),
+					num_ctx: config.numCtx ?? 16384,
 					num_predict: config.numPredict ?? 16384,
-					num_batch: 512,
-					keep_alive: '30m',
+					num_batch: config.numBatch ?? 512,
+					keep_alive: config.keepAlive ?? '30m',
+					...(config.numThread != null ? { num_thread: config.numThread } : {}),
+					...(config.numGpu != null ? { num_gpu: config.numGpu } : {}),
 				},
 			};
 
@@ -886,12 +889,12 @@ async function streamCompletion(
 
 		if (!res.ok) {
 			const errText = await res.text().catch(() => '');
-			let message = errText.slice(0, 800) || res.statusText;
+			let message = redactSecrets(errText.slice(0, 800) || res.statusText);
 			try {
 				const parsed = JSON.parse(errText) as { error?: { message?: string } };
-				if (parsed.error?.message) message = parsed.error.message;
+				if (parsed.error?.message) message = redactSecrets(parsed.error.message);
 			} catch { /* raw text */ }
-			lastError = `${providerLabel} ${res.status}: ${message}`;
+			lastError = redactSecrets(`${providerLabel} ${res.status}: ${message}`);
 			const modelMissing = res.status === 404
 				|| /does not exist|not found|do not have access|model_not_found/i.test(message);
 			const rateLimited = res.status === 429

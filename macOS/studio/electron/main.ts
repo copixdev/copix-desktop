@@ -20,6 +20,7 @@ import {
 } from '../src/utils/workspaceIgnore.js';
 import { expandWorkspaceHome } from '../src/utils/workspaceHome.js';
 import { DEFAULT_SETTINGS } from '../src/types.js';
+import { absorbPlainProviderKey, readProviderSecret, saveProviderSecret, stringifySettings } from './providerSecret.js';
 
 // Brand as Copix (not "Electron") in taskbar / Jump Lists / process UI.
 const APP_NAME = 'Copix';
@@ -82,13 +83,13 @@ function terminalEnv(): NodeJS.ProcessEnv {
 	return { ...process.env, PATH: merged, HOME: home };
 }
 
-function readModelSettingsFromDisk(): { provider?: string; apiKey?: string } {
+function readProviderFromDisk(): string | undefined {
 	try {
 		const raw = fsSync.readFileSync(settingsPath(), 'utf8');
-		const parsed = JSON.parse(raw) as { model?: { provider?: string; apiKey?: string } };
-		return parsed.model ?? {};
+		const parsed = JSON.parse(raw) as { model?: { provider?: string } };
+		return parsed.model?.provider;
 	} catch {
-		return {};
+		return undefined;
 	}
 }
 
@@ -99,9 +100,8 @@ const CLOUD_BASE_URLS: Record<string, string> = {
 };
 
 async function fetchCloudStatus(provider: string): Promise<{ online: boolean; hasModel: boolean }> {
-	const { apiKey } = readModelSettingsFromDisk();
-	const key = apiKey?.trim();
-	if (!key || /gsk_YOUR_KEY_HERE/i.test(key)) return { online: false, hasModel: false };
+	const key = (await readProviderSecret()).trim();
+	if (!key || /YOUR_KEY_HERE/i.test(key)) return { online: false, hasModel: false };
 	const baseUrl = CLOUD_BASE_URLS[provider] ?? GROQ_BASE_URL;
 	try {
 		const res = await fetch(`${baseUrl}/models`, {
@@ -143,8 +143,7 @@ async function fetchServerHealth(): Promise<{
 	missing?: string[];
 	provider?: string;
 }> {
-	const modelSettings = readModelSettingsFromDisk();
-	const provider = normalizeProvider(modelSettings.provider);
+	const provider = normalizeProvider(readProviderFromDisk());
 
 	if (provider !== 'ollama') {
 		const g = await fetchCloudStatus(provider);
@@ -168,8 +167,7 @@ async function fetchServerHealth(): Promise<{
 }
 
 async function ensureCopixModelsInternal(full = false): Promise<{ ok: boolean; message: string; pulled: string[] }> {
-	const modelSettings = readModelSettingsFromDisk();
-	const diskProvider = normalizeProvider(modelSettings.provider);
+	const diskProvider = normalizeProvider(readProviderFromDisk());
 	if (diskProvider !== 'ollama') {
 		const keyHint = diskProvider === 'groq'
 			? 'free key at console.groq.com'
@@ -180,7 +178,7 @@ async function ensureCopixModelsInternal(full = false): Promise<{ ok: boolean; m
 		if (!g.online) {
 			return {
 				ok: false,
-				message: `Add model.apiKey in ~/Copix/settings.json — ${keyHint}`,
+				message: `Add your key in Settings (${keyHint}). It is stored in the system keychain.`,
 				pulled: [],
 			};
 		}
@@ -222,21 +220,117 @@ async function ensureCopixModelsInternal(full = false): Promise<{ ok: boolean; m
 }
 
 async function pullModelInternal(model: string): Promise<{ ok: boolean; message: string }> {
+	const name = (model || FALLBACK_MODEL_ID).trim() || FALLBACK_MODEL_ID;
+	const ctrl = new AbortController();
+	const timer = setTimeout(() => ctrl.abort(), 4000);
+	try {
+		const res = await fetch(`${OLLAMA_HOST}/api/pull`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, stream: true }),
+			signal: ctrl.signal,
+		});
+		clearTimeout(timer);
+		if (!res.ok || !res.body) {
+			return { ok: false, message: 'Ollama could not start the download' };
+		}
+		const reader = res.body.getReader();
+		const decoder = new TextDecoder();
+		let buf = '';
+		let failed = false;
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buf += decoder.decode(value, { stream: true });
+			let nl = buf.indexOf('\n');
+			while (nl >= 0) {
+				const line = buf.slice(0, nl).trim();
+				buf = buf.slice(nl + 1);
+				nl = buf.indexOf('\n');
+				if (!line) continue;
+				try {
+					const ev = JSON.parse(line) as { status?: string; completed?: number; total?: number; error?: string };
+					if (ev.error) failed = true;
+					const pct = ev.total && ev.total > 0
+						? Math.min(100, Math.round(((ev.completed ?? 0) / ev.total) * 100))
+						: null;
+					const text = pct == null ? (ev.status ?? 'pulling') : `${ev.status ?? 'pulling'} ${pct}%`;
+					mainWindow?.webContents.send('copix:pullProgress', text);
+				} catch {
+					mainWindow?.webContents.send('copix:pullProgress', 'pulling');
+				}
+			}
+		}
+		if (failed) return { ok: false, message: 'Ollama could not download the model' };
+		mainWindow?.webContents.send('copix:pullProgress', 'success 100%');
+		return { ok: true, message: `Downloaded ${name}` };
+	} catch (err) {
+		clearTimeout(timer);
+		const aborted = err instanceof Error && err.name === 'AbortError';
+		return { ok: false, message: aborted ? 'Ollama did not respond' : 'Ollama is not running' };
+	}
+}
+
+function withTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
 	return new Promise(resolve => {
-		const proc = spawn('ollama', ['pull', model], { shell: true });
-		let out = '';
-		const chunk = (d: Buffer) => {
-			const t = d.toString();
-			out += t;
-			mainWindow?.webContents.send('copix:pullProgress', t);
-		};
-		proc.stdout?.on('data', chunk);
-		proc.stderr?.on('data', chunk);
-		proc.on('close', code => resolve({
-			ok: code === 0,
-			message: code === 0 ? `Downloaded ${model}` : out.slice(-500) || 'ollama pull failed',
-		}));
+		const timer = setTimeout(() => resolve(fallback), ms);
+		work.then(
+			value => { clearTimeout(timer); resolve(value); },
+			() => { clearTimeout(timer); resolve(fallback); },
+		);
 	});
+}
+
+function cliAvailable(): Promise<boolean> {
+	return new Promise(resolve => {
+		const isWin = process.platform === 'win32';
+		const proc = spawn(isWin ? 'where.exe' : 'which', ['copix'], {
+			env: terminalEnv(),
+			windowsHide: true,
+		});
+		const timer = setTimeout(() => {
+			proc.kill();
+			resolve(false);
+		}, 2000);
+		proc.on('error', () => { clearTimeout(timer); resolve(false); });
+		proc.on('close', code => { clearTimeout(timer); resolve(code === 0); });
+	});
+}
+
+async function collectSetupChecks(): Promise<{
+	ollamaOnline: boolean;
+	models: string[];
+	hasModel: boolean;
+	folderExists: boolean;
+	folderLabel: string;
+	cliAvailable: boolean;
+	ramGb: number;
+	cpuCount: number;
+}> {
+	const ollama = await withTimeout(
+		fetchOllamaStatus(),
+		2500,
+		{ online: false, hasModel: false, models: [] as string[], missing: [] as string[] },
+	);
+	let folderExists = false;
+	try {
+		await fs.access(copixDir());
+		folderExists = true;
+	} catch {
+		folderExists = false;
+	}
+	const cli = await cliAvailable();
+	const ramGb = os.totalmem() / (1024 ** 3);
+	return {
+		ollamaOnline: ollama.online,
+		models: ollama.models,
+		hasModel: ollama.models.length > 0,
+		folderExists,
+		folderLabel: '~/Copix',
+		cliAvailable: cli,
+		ramGb,
+		cpuCount: os.cpus().length,
+	};
 }
 
 /** User-visible Copix directory: ~/Copix (settings.json lives here). */
@@ -537,7 +631,8 @@ type MenuAction =
 	| 'clone-repo'
 	| 'command-palette'
 	| 'toggle-editor'
-	| 'focus-agent';
+	| 'focus-agent'
+	| 'open-settings';
 
 function sendMenuAction(action: MenuAction): void {
 	const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
@@ -553,6 +648,11 @@ function installApplicationMenu(): void {
 				label: APP_NAME,
 				submenu: [
 					{ role: 'about' as const },
+					{
+						label: 'Settings…',
+						accelerator: 'CmdOrCtrl+,',
+						click: () => sendMenuAction('open-settings'),
+					},
 					{ type: 'separator' as const },
 					{ role: 'services' as const },
 					{ type: 'separator' as const },
@@ -580,6 +680,11 @@ function installApplicationMenu(): void {
 				{
 					label: 'Clone Repository…',
 					click: () => sendMenuAction('clone-repo'),
+				},
+				{
+					label: 'Settings…',
+					accelerator: 'CmdOrCtrl+,',
+					click: () => sendMenuAction('open-settings'),
 				},
 				{ type: 'separator' },
 				isMac ? { role: 'close' } : { role: 'quit' },
@@ -761,8 +866,7 @@ async function loadRenderer(win: BrowserWindow, mode?: 'editor'): Promise<void> 
 }
 
 app.whenReady().then(() => {
-	// Match locked dark UI — system menu bar / chrome follow dark appearance
-	nativeTheme.themeSource = 'dark';
+	nativeTheme.themeSource = 'system';
 	installApplicationMenu();
 
 	ipcMain.handle('copix:getSettings', async () => {
@@ -770,25 +874,52 @@ app.whenReady().then(() => {
 			ensureCopixDir();
 			const primary = settingsPath();
 			if (fsSync.existsSync(primary)) {
-				return JSON.parse(await fs.readFile(primary, 'utf8'));
+				const parsed = JSON.parse(await fs.readFile(primary, 'utf8'));
+				const absorbed = await absorbPlainProviderKey(parsed);
+				if (absorbed.changed) {
+					await fs.writeFile(primary, stringifySettings(absorbed.settings), { mode: 0o600 });
+				}
+				return absorbed.settings;
 			}
 			const legacy = legacyConfigPath();
 			if (fsSync.existsSync(legacy)) {
 				const raw = await fs.readFile(legacy, 'utf8');
-				const parsed = JSON.parse(raw);
-				await fs.writeFile(primary, JSON.stringify(parsed, null, 2), 'utf8');
-				return parsed;
+				const absorbed = await absorbPlainProviderKey(JSON.parse(raw));
+				await fs.writeFile(primary, stringifySettings(absorbed.settings), { mode: 0o600 });
+				return absorbed.settings;
 			}
-			await fs.writeFile(primary, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf8');
+			await fs.writeFile(primary, stringifySettings(DEFAULT_SETTINGS), { mode: 0o600 });
 			return DEFAULT_SETTINGS;
 		} catch {
+			console.error('[copix] Could not read settings');
 			return DEFAULT_SETTINGS;
 		}
 	});
 
 	ipcMain.handle('copix:setSettings', async (_e, settings: unknown) => {
 		ensureCopixDir();
-		await fs.writeFile(settingsPath(), JSON.stringify(settings, null, 2), 'utf8');
+		const absorbed = await absorbPlainProviderKey(settings);
+		await fs.writeFile(settingsPath(), stringifySettings(absorbed.settings), { mode: 0o600 });
+	});
+
+	ipcMain.handle('copix:getProviderSecret', () => readProviderSecret());
+
+	ipcMain.handle('copix:setProviderSecret', async (_e, secret: unknown) => {
+		if (typeof secret !== 'string') return { ok: false, message: 'Invalid key' };
+		return saveProviderSecret(secret);
+	});
+
+	ipcMain.handle('copix:setNativeTheme', (_e, theme: unknown) => {
+		if (theme === 'light' || theme === 'dark' || theme === 'system') {
+			nativeTheme.themeSource = theme;
+		}
+	});
+
+	ipcMain.handle('copix:getSetupChecks', () => collectSetupChecks());
+
+	ipcMain.handle('copix:createCopixFolder', async () => {
+		ensureCopixDir();
+		return { ok: true, path: copixDir() };
 	});
 
 	// Shared agent history (~/Copix/sessions.json) — synced between Desktop and CLI.
@@ -1022,12 +1153,6 @@ function looksLikeSecretPath(filePath: string): boolean {
 	ipcMain.handle('copix:ensureCopixModels', () => ensureCopixModelsInternal(false));
 
 	createWindow();
-
-	void ensureCopixModelsInternal(false).then(result => {
-		if (result.pulled.length) {
-			mainWindow?.webContents.send('copix:modelsReady', result.message);
-		}
-	}).catch(() => undefined);
 });
 
 app.on('activate', () => {

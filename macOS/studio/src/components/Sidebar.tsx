@@ -24,6 +24,7 @@ interface Props {
 	onArchiveSession: (id: string) => void;
 	onDeleteSession: (id: string) => void;
 	onRestoreSession: (id: string) => void;
+	onOpenSettings?: () => void;
 }
 
 const HOME_KEY = '__home__';
@@ -86,7 +87,7 @@ type RepoGroup = {
 export function Sidebar({
 	sessions, activeId, workspace,
 	onSelectSession, onNewChat, onOpenFolder, onCloneRepo,
-	onOpenPalette, onTogglePinSession, onArchiveSession, onDeleteSession,
+	onOpenPalette, onTogglePinSession, onArchiveSession, onDeleteSession, onOpenSettings,
 }: Props) {
 	const [repoFilter, setRepoFilter] = useState('');
 	const [showFilter, setShowFilter] = useState(false);
@@ -169,6 +170,10 @@ export function Sidebar({
 	};
 
 	const openCustomize = async () => {
+		if (onOpenSettings) {
+			onOpenSettings();
+			return;
+		}
 		try {
 			const cmd = isWindows()
 				? 'Invoke-Item "$env:USERPROFILE\\Copix\\settings.json"'

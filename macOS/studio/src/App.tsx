@@ -15,9 +15,14 @@ import { resolveModelConfig } from './models/config';
 import { normalizeProvider } from './models/modelCatalog';
 import { formatModelChipLabel, preferredModelForTask } from './models/modelSelector';
 import { TitleBarMenu } from './components/TitleBarMenu';
+import { Onboarding } from './components/Onboarding';
+import { OnboardingPreview } from './components/OnboardingPreview';
+import { SettingsPanel } from './components/SettingsPanel';
+import { clearOnboardingDoneLocally, markOnboardingDoneLocally, onboardingDoneLocally } from './onboarding/flags';
 import { collectSessionChanges, type FileChange } from './utils/fileChanges';
 import { subscribeAgentTerminal } from './utils/terminalBridge';
 import { isMac } from './utils/platform';
+import type { AppLanguage, ModelProvider, ThemePreference } from './types';
 
 async function ensureWorkspace(session: ChatSession): Promise<ChatSession> {
 	const normalized = session.workspaceRoot?.replace(/\\/g, '/') ?? '';
@@ -65,6 +70,9 @@ function AppInner() {
 	const [activeSessionId, setActiveSessionId] = useState(() => sessions[0]?.id ?? '');
 	const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 	const [settingsReady, setSettingsReady] = useState(false);
+	const [providerKey, setProviderKey] = useState('');
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
 	const [tree, setTree] = useState<string[]>([]);
 	const [serverOnline, setServerOnline] = useState(false);
 	const [installedModels, setInstalledModels] = useState<string[]>([]);
@@ -86,15 +94,22 @@ function AppInner() {
 		[activeSession?.messages],
 	);
 	const displayedFileChanges = reviewFiles ?? fileChanges;
+	const liveSettings = useMemo(() => ({
+		...settings,
+		model: { ...settings.model, apiKey: providerKey },
+	}), [settings, providerKey]);
 	const statusBarModel = formatModelChipLabel(
-		settings.model,
-		resolveModelConfig(settings.model, settings.agentMode, installedModels).model,
+		liveSettings.model,
+		resolveModelConfig(liveSettings.model, settings.agentMode, installedModels).model,
 		{
-			preferred: preferredModelForTask(settings.agentMode, settings.model),
+			preferred: preferredModelForTask(settings.agentMode, liveSettings.model),
 			installed: installedModels,
 		},
 	);
-	const modelProvider = normalizeProvider(settings.model.provider);
+	const modelProvider = normalizeProvider(liveSettings.model.provider);
+	const resolvedTheme: 'light' | 'dark' = settings.theme === 'system'
+		? (systemDark ? 'dark' : 'light')
+		: settings.theme;
 
 	useEffect(() => { setReviewFiles(null); }, [activeSessionId]);
 
@@ -142,22 +157,24 @@ function AppInner() {
 	}, []);
 
 	useEffect(() => {
+		let cancelled = false;
 		copix.getSettings().then(s => {
-			if (!s) {
-				setSettingsReady(true);
-				return;
-			}
-			if ('presetId' in s) {
+			if (cancelled) return;
+			if (!s || ('presetId' in (s as object))) {
 				setSettings(DEFAULT_SETTINGS);
 				setSettingsReady(true);
 				return;
 			}
 			const raw = s as AppSettings & { model?: Partial<AppSettings['model']> };
-			// Copix uses local Ollama by default — ignore cloud providers in settings.
-			const provider = 'ollama' as const;
+			const providerRaw = raw.model?.provider;
+			const provider: ModelProvider = providerRaw === 'openrouter' || providerRaw === 'groq' || providerRaw === 'openai' || providerRaw === 'ollama'
+				? providerRaw
+				: 'ollama';
 			const rawModelId = raw.model?.modelId ?? DEFAULT_SETTINGS.model.modelId;
 			const looksCloudModel = /^(~?anthropic\/|openai\/|google\/|meta-llama\/|llama-3\.|gpt-|o3)/i.test(rawModelId);
-			const modelId = looksCloudModel ? DEFAULT_SETTINGS.model.modelId : rawModelId;
+			const modelId = provider === 'ollama' && looksCloudModel ? DEFAULT_SETTINGS.model.modelId : rawModelId;
+			const theme: ThemePreference = raw.theme === 'light' || raw.theme === 'system' || raw.theme === 'dark' ? raw.theme : 'dark';
+			const language: AppLanguage = raw.language === 'ko' ? 'ko' : 'en';
 			setSettings({
 				...DEFAULT_SETTINGS, ...raw,
 				model: {
@@ -166,7 +183,7 @@ function AppInner() {
 					selection: raw.model?.selection === 'manual' ? 'manual' : 'auto',
 					modelId,
 					provider,
-					apiKey: typeof raw.model?.apiKey === 'string' ? raw.model.apiKey : '',
+					apiKey: '',
 				},
 				layout: { ...DEFAULT_SETTINGS.layout, ...raw.layout },
 				workspace: {
@@ -176,20 +193,40 @@ function AppInner() {
 						? ''
 						: (raw.workspace?.homeDirectory ?? DEFAULT_SETTINGS.workspace.homeDirectory),
 				},
-				theme: 'dark',
+				theme,
+				language,
+				onboardingCompleted: raw.onboardingCompleted === true || onboardingDoneLocally(),
 			});
 			setSettingsReady(true);
-		}).catch(() => setSettingsReady(true));
+		}).catch(() => { if (!cancelled) setSettingsReady(true); });
+		if (window.copix?.getProviderSecret) {
+			void window.copix.getProviderSecret().then(key => {
+				if (!cancelled && typeof key === 'string') setProviderKey(key);
+			}).catch(() => undefined);
+		}
+		return () => { cancelled = true; };
 	}, []);
 
 	useEffect(() => {
 		if (!settingsReady) return;
-		void copix.setSettings({ ...settings, theme: 'dark' });
+		void copix.setSettings({ ...settings, model: { ...settings.model, apiKey: '' } });
+		try { localStorage.setItem('copix.theme', settings.theme); } catch { /* ignore */ }
 	}, [settings, settingsReady]);
 
 	useEffect(() => {
-		document.documentElement.dataset.theme = 'dark';
-	}, []);
+		const apply = () => {
+			const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+			setSystemDark(prefersDark);
+			const dark = settings.theme === 'dark' || (settings.theme === 'system' && prefersDark);
+			document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+			document.documentElement.lang = settings.language === 'ko' ? 'ko' : 'en';
+			void window.copix?.setNativeTheme?.(settings.theme);
+		};
+		apply();
+		const mq = window.matchMedia('(prefers-color-scheme: dark)');
+		mq.addEventListener('change', apply);
+		return () => mq.removeEventListener('change', apply);
+	}, [settings.theme, settings.language]);
 
 	useEffect(() => {
 		const poll = () => copix.getServerStatus().then(s => {
@@ -199,17 +236,6 @@ function AppInner() {
 		poll();
 		const t = setInterval(poll, 4000);
 		return () => clearInterval(t);
-	}, []);
-
-	useEffect(() => {
-		void copix.ensureCopixModels?.().then(r => {
-			if (r?.pulled?.length) {
-				return copix.getServerStatus().then(s => {
-					setServerOnline(s.online);
-					setInstalledModels(s.models ?? []);
-				});
-			}
-		}).catch(() => undefined);
 	}, []);
 
 	useEffect(() => {
@@ -413,6 +439,9 @@ function AppInner() {
 				case 'focus-agent':
 					focusComposer();
 					break;
+				case 'open-settings':
+					setSettingsOpen(true);
+					break;
 				default:
 					break;
 			}
@@ -426,6 +455,7 @@ function AppInner() {
 		{ id: 'focus-agent', label: 'Focus Agent Input', hint: 'Ctrl+L', category: 'actions', run: focusComposer },
 		{ id: 'toggle-editor', label: editorVisible ? 'Hide Editor Panel' : 'Show Editor Panel', hint: 'Ctrl+B', category: 'actions', run: () => setEditorVisible(v => !v) },
 		{ id: 'open-folder', label: 'Open Folder…', hint: 'Files', category: 'files', run: openFolder },
+		{ id: 'settings', label: 'Settings…', hint: 'CmdOrCtrl+,', category: 'actions', run: () => setSettingsOpen(true) },
 		{ id: 'clone-repo', label: 'Clone Repository…', hint: 'Git URL', category: 'files', run: () => {
 			const url = window.prompt('Repository URL');
 			if (url?.trim()) void cloneRepo(url.trim());
@@ -463,7 +493,7 @@ function AppInner() {
 			}}
 			workspace={workspace}
 			tree={tree}
-			theme="dark"
+			theme={resolvedTheme}
 			onNewAgent={handleNewChat}
 			onOpenFolder={async () => {
 				await openFolder();
@@ -476,6 +506,74 @@ function AppInner() {
 				layout: { ...prev.layout, editorWidth: 640 },
 			}))}
 		/>
+	);
+
+	const showWizard = settingsReady
+		&& bootMode !== 'editor'
+		&& !settings.onboardingCompleted
+		&& !onboardingDoneLocally();
+	const wizardProvider = settings.model.provider === 'openrouter' ? 'openrouter' : 'ollama';
+
+	const rememberKey = async (key: string) => {
+		if (!window.copix?.setProviderSecret) {
+			return { ok: false, message: 'Secure storage is unavailable' };
+		}
+		const result = await window.copix.setProviderSecret(key);
+		if (result.ok) setProviderKey(key.trim());
+		return result;
+	};
+
+	const finishOnboarding = (prompt?: string) => {
+		markOnboardingDoneLocally();
+		setSettings(prev => ({ ...prev, onboardingCompleted: true }));
+		if (prompt) patchSession(activeSessionId, { pendingPrompt: prompt });
+	};
+
+	const setupUi = (
+		<>
+			{showWizard && (
+				<Onboarding
+					language={settings.language}
+					theme={settings.theme}
+					provider={wizardProvider}
+					model={settings.model}
+					hasStoredKey={providerKey.trim().length > 0}
+					onLanguage={language => setSettings(prev => ({ ...prev, language }))}
+					onTheme={theme => setSettings(prev => ({ ...prev, theme }))}
+					onProvider={provider => setSettings(prev => ({
+						...prev,
+						model: { ...prev.model, provider, apiKey: '' },
+					}))}
+					onModel={model => setSettings(prev => ({ ...prev, model: { ...model, apiKey: '' } }))}
+					onSaveKey={rememberKey}
+					onComplete={prompt => finishOnboarding(prompt)}
+					onSkip={() => finishOnboarding()}
+				/>
+			)}
+			{settingsOpen && (
+				<SettingsPanel
+					language={settings.language}
+					theme={settings.theme}
+					provider={settings.model.provider ?? 'ollama'}
+					model={settings.model}
+					hasStoredKey={providerKey.trim().length > 0}
+					onLanguage={language => setSettings(prev => ({ ...prev, language }))}
+					onTheme={theme => setSettings(prev => ({ ...prev, theme }))}
+					onProvider={provider => setSettings(prev => ({
+						...prev,
+						model: { ...prev.model, provider, apiKey: '' },
+					}))}
+					onModel={model => setSettings(prev => ({ ...prev, model: { ...model, apiKey: '' } }))}
+					onSaveKey={rememberKey}
+					onRunSetup={() => {
+						clearOnboardingDoneLocally();
+						setSettings(prev => ({ ...prev, onboardingCompleted: false }));
+						setSettingsOpen(false);
+					}}
+					onClose={() => setSettingsOpen(false)}
+				/>
+			)}
+		</>
 	);
 
 	if (bootMode === 'editor') {
@@ -495,6 +593,7 @@ function AppInner() {
 					provider={modelProvider}
 					online={serverOnline}
 				/>
+				{setupUi}
 			</div>
 		);
 	}
@@ -514,6 +613,7 @@ function AppInner() {
 							}}
 							onToggleEditor={() => setEditorVisible(v => !v)}
 							onOpenPalette={() => setPaletteOpen(true)}
+							onOpenSettings={() => setSettingsOpen(true)}
 						/>
 					</>
 				)}
@@ -546,6 +646,7 @@ function AppInner() {
 						onArchiveSession={archiveSession}
 						onDeleteSession={deleteSession}
 						onRestoreSession={restoreSession}
+						onOpenSettings={() => setSettingsOpen(true)}
 					/>
 				}
 				chat={
@@ -554,7 +655,7 @@ function AppInner() {
 						sessionId={activeSessionId}
 						workspace={workspace}
 						workspaceEnv={workspaceEnv}
-						settings={settings}
+						settings={liveSettings}
 						tree={tree}
 						messages={activeSession?.messages ?? []}
 						onMessagesChange={(msgs, title) =>
@@ -577,7 +678,7 @@ function AppInner() {
 					/>
 					<SubagentDock
 						sessions={subagentSessions}
-						settings={settings}
+						settings={liveSettings}
 						installedModels={installedModels}
 						serverOnline={serverOnline}
 						onMessagesChange={(id, msgs, title) =>
@@ -615,11 +716,16 @@ function AppInner() {
 					}))}
 				onClose={() => setPaletteOpen(false)}
 			/>
+			{setupUi}
 		</div>
 	);
 }
 
 export default function App() {
+	const preview = new URLSearchParams(window.location.search).get('onboardingPreview') === '1';
+	if (preview) {
+		return <OnboardingPreview />;
+	}
 	return (
 		<ToastProvider>
 			<AppInner />

@@ -117,12 +117,17 @@ export function selectModelForTask(
 	const normalized = normalizeModelSettings(settings);
 	const provider = normalizeProvider(settings.provider);
 
+	if (provider === 'ollama' && settings.singleModel) {
+		return normalized.modelId?.trim() || FALLBACK_MODEL_ID;
+	}
+
 	if (normalized.selection === 'manual') {
 		const manual = normalized.modelId
 			|| (provider === 'ollama' ? FALLBACK_MODEL_ID : defaultCloudModel(provider));
 		if (provider === 'groq') return sanitizeGroqModelId(manual);
 		if (provider === 'openrouter' || provider === 'openai') return manual;
 		if (modelIsAvailable(manual, installed)) return manual;
+		if (settings.singleModel) return manual;
 		return modelIsAvailable(FALLBACK_MODEL_ID, installed) ? FALLBACK_MODEL_ID : manual;
 	}
 
@@ -158,6 +163,9 @@ export function preferredModelForTask(
 	userMessage?: string,
 ): string {
 	const provider = normalizeProvider(settings.provider);
+	if (provider === 'ollama' && settings.singleModel) {
+		return settings.modelId?.trim() || FALLBACK_MODEL_ID;
+	}
 	const taskKind = userMessage ? inferTaskKind(userMessage, agentMode) : null;
 	if (provider === 'openrouter' || provider === 'openai') {
 		return settings.modelId || defaultCloudModel(provider);

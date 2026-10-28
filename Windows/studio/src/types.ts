@@ -47,7 +47,9 @@ export interface WorkspaceSettings {
 	homeDirectory: string;
 }
 
-export type ThemePreference = 'dark';
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+export type AppLanguage = 'en' | 'ko';
 
 export type ModelSelectionMode = 'auto' | 'manual';
 
@@ -67,6 +69,15 @@ export interface ModelSettings {
 	modelId: string;
 	/** Safer local inference: smaller context, prefers lighter models in auto mode. */
 	lowVram?: boolean;
+	/** When set, Copix never adds a second Ollama model candidate. */
+	singleModel?: boolean;
+	numCtx?: number;
+	numPredict?: number;
+	/** Ollama keep_alive, for example "5m". */
+	keepAlive?: string;
+	numThread?: number;
+	/** 0 keeps the model on CPU. */
+	numGpu?: number;
 }
 
 /** Local app settings — persisted to ~/Copix/settings.json */
@@ -75,6 +86,9 @@ export interface AppSettings {
 	layout: LayoutSettings;
 	workspace: WorkspaceSettings;
 	theme: ThemePreference;
+	language: AppLanguage;
+	/** Set after the first-run wizard is finished or skipped. */
+	onboardingCompleted: boolean;
 	agentMode: AgentMode;
 }
 
@@ -100,5 +114,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 	layout: DEFAULT_LAYOUT,
 	workspace: DEFAULT_WORKSPACE,
 	theme: 'dark',
+	language: 'en',
+	onboardingCompleted: false,
 	agentMode: 'code',
 };

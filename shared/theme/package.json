@@ -1,0 +1,13 @@
+{
+  "name": "@copix/theme",
+  "private": true,
+  "version": "4.5.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "happy-dom": "^17.6.3",
+    "vitest": "^3.2.7"
+  }
+}
